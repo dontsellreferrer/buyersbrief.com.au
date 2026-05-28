@@ -1,9 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Loader2, X, Plus } from 'lucide-react';
 
 interface BriefData {
   suburb: string;
@@ -22,76 +18,20 @@ interface BriefData {
   financeStatus: string;
 }
 
-interface MatchResult {
-  address: string;
-  suburb: string;
-  price: string;
-  bedrooms: number;
-  bathrooms: number;
-  parking: number;
-  score: number;
-  hits: string[];
-  misses: string[];
-  liamNote: string;
-}
-
-const BBIcon = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
-  const sizeMap = {
-    sm: { doc: 'w-3 h-4', pin: 'w-1.5 h-1.5', inner: 'w-1 h-1' },
-    md: { doc: 'w-5 h-6', pin: 'w-2.5 h-2.5', inner: 'w-1 h-1' },
-    lg: { doc: 'w-6 h-7', pin: 'w-3 h-3', inner: 'w-1.5 h-1.5' },
-  };
-  const s = sizeMap[size];
-  return (
-    <div className="inline-block flex-shrink-0">
-      <div className={`${s.doc} bg-sky relative`}>
-        <div className="absolute top-1/3 left-1/4 flex flex-col gap-1">
-          <div className="bg-offwhite bg-opacity-75 rounded h-0.5" style={{ width: '68%' }} />
-          <div className="bg-offwhite bg-opacity-75 rounded h-0.5" style={{ width: '73%' }} />
-          <div className="bg-offwhite bg-opacity-75 rounded h-0.5" style={{ width: '85%' }} />
-          <div className="bg-offwhite bg-opacity-75 rounded h-0.5" style={{ width: '60%' }} />
-        </div>
-        <div className={`${s.pin} bg-rose rounded-full absolute -top-1/3 -right-1/3`}>
-          <div className={`${s.inner} bg-offwhite rounded-full`} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ScoreRing = ({ score }: { score: number }) => {
-  const circumference = 2 * Math.PI * 45;
-  const offset = circumference - (score / 100) * circumference;
-  
-  return (
-    <div className="relative w-24 h-24">
-      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="#f0f0f0" strokeWidth="8" />
-        <circle
-          cx="50"
-          cy="50"
-          r="45"
-          fill="none"
-          stroke="#0ea5e9"
-          strokeWidth="8"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-1000"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
-          <div className="font-outfit text-2xl font-bold text-charcoal">{score}%</div>
-          <div className="font-figtree text-xs text-mid">Match</div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const TagInput = ({ tags, onTagsChange, placeholder = 'Add tag and press Enter' }: { tags: string[]; onTagsChange: (tags: string[]) => void; placeholder?: string }) => {
+/* ── Tag Input ── */
+function TagInput({
+  tags,
+  onTagsChange,
+  tagType = 'need',
+  placeholder = 'Add and press Enter',
+}: {
+  tags: string[];
+  onTagsChange: (tags: string[]) => void;
+  tagType?: 'nn' | 'need' | 'want' | 'nth';
+  placeholder?: string;
+}) {
   const [input, setInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && input.trim()) {
@@ -99,253 +39,462 @@ const TagInput = ({ tags, onTagsChange, placeholder = 'Add tag and press Enter' 
       onTagsChange([...tags, input.trim()]);
       setInput('');
     }
-  };
-
-  const removeTag = (index: number) => {
-    onTagsChange(tags.filter((_, i) => i !== index));
+    if (e.key === 'Backspace' && !input && tags.length > 0) {
+      onTagsChange(tags.slice(0, -1));
+    }
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2 mb-2">
-        {tags.map((tag, idx) => (
-          <div key={idx} className="bg-sky text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
-            {tag}
-            <button
-              type="button"
-              onClick={() => removeTag(idx)}
-              className="hover:opacity-70 transition-opacity"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-      <Input
+    <div className="tag-input-wrap" onClick={() => inputRef.current?.focus()}>
+      {tags.map((tag, idx) => (
+        <span key={idx} className={`tag-item tag-${tagType}`}>
+          {tag}
+          <button
+            type="button"
+            className="tag-remove"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTagsChange(tags.filter((_, i) => i !== idx));
+            }}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
         type="text"
-        placeholder={placeholder}
+        className="tag-text-input"
+        placeholder={tags.length === 0 ? placeholder : ''}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="w-full font-figtree text-sm font-normal text-charcoal bg-offwhite border border-transparent rounded-lg p-2.5 outline-none transition-all focus:border-sky focus:bg-white"
       />
     </div>
   );
-};
+}
 
+/* ── Step Card ── */
+function StepCard({
+  stepNum,
+  title,
+  subtitle,
+  isActive,
+  isCompleted,
+  isLocked,
+  summary,
+  children,
+  onToggle,
+}: {
+  stepNum: number;
+  title: string;
+  subtitle: string;
+  isActive: boolean;
+  isCompleted: boolean;
+  isLocked: boolean;
+  summary?: string;
+  children: React.ReactNode;
+  onToggle: () => void;
+}) {
+  const cls = [
+    'step-card',
+    isActive && 'active',
+    isCompleted && 'completed',
+    isLocked && 'locked',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <>
+      <div className={cls}>
+        <div className="step-header" onClick={isLocked ? undefined : onToggle}>
+          <div className="step-num">{isCompleted ? '✓' : stepNum}</div>
+          <div className="step-header-text">
+            <div className="step-title">{title}</div>
+            <div className="step-subtitle">{subtitle}</div>
+          </div>
+          {summary && <div className="step-summary">{summary}</div>}
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#7FA8D4"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              transition: 'transform 0.2s',
+              transform: isActive ? 'rotate(180deg)' : 'rotate(0)',
+              flexShrink: 0,
+            }}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+        <div className="step-body">{children}</div>
+      </div>
+      {/* Progress line between cards */}
+      <div className={`progress-line ${isCompleted ? 'done' : ''}`} />
+    </>
+  );
+}
+
+/* ── Main Component ── */
 export default function BriefIntake() {
   const [, navigate] = useLocation();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [matches, setMatches] = useState<MatchResult[]>([]);
-  const [briefData, setBriefData] = useState<BriefData>({
-    suburb: '',
-    propertyType: '',
-    beds: '',
-    baths: '',
-    parking: '',
-    budget: '',
-    nonNegotiables: [],
-    needs: [],
-    wants: [],
-    niceToHaves: [],
-    buyerStory: '',
-    budgetCeiling: '',
-    timeline: '',
-    financeStatus: '',
+  const [stepStates, setStepStates] = useState<Record<number, boolean>>({
+    1: true, 2: false, 3: false, 4: false, 5: false, 6: false,
   });
 
-  // Load brief basics from sessionStorage
+  const [briefData, setBriefData] = useState<BriefData>({
+    suburb: '', propertyType: '', beds: '', baths: '', parking: '', budget: '',
+    nonNegotiables: [], needs: [], wants: [], niceToHaves: [],
+    buyerStory: '', budgetCeiling: '', timeline: '', financeStatus: '',
+  });
+
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [budgetValue, setBudgetValue] = useState(850000);
+
+  // Load brief basics from sessionStorage (from homepage card)
   useEffect(() => {
     const saved = sessionStorage.getItem('briefBasics');
     if (saved) {
-      const basics = JSON.parse(saved);
-      setBriefData((prev) => ({ ...prev, ...basics }));
+      try {
+        const basics = JSON.parse(saved);
+        setBriefData((prev) => ({ ...prev, ...basics }));
+      } catch { /* ignore */ }
     }
   }, []);
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    try {
-      // Call the backend API to search with Claude
-      const response = await fetch('/api/trpc/briefs.search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ briefData }),
-      });
+  const toggleStep = (num: number) => {
+    setStepStates((prev) => {
+      const next = { ...prev };
+      // Close all others, toggle this one
+      Object.keys(next).forEach((k) => (next[Number(k)] = false));
+      next[num] = !prev[num];
+      return next;
+    });
+  };
 
-      if (!response.ok) throw new Error('Search failed');
+  const markComplete = (num: number) =>
+    setCompletedSteps((prev) => new Set(prev).add(num));
 
-      const result = await response.json();
-      setMatches(result.matches || []);
-      setStep(7); // Show results
-    } catch (error) {
-      console.error('Search error:', error);
-      // Show demo results if API fails
-      setMatches(getDemoMatches());
-      setStep(7);
-    } finally {
-      setLoading(false);
+  const summary = (num: number): string => {
+    switch (num) {
+      case 1: return briefData.nonNegotiables.length > 0 ? `${briefData.nonNegotiables.length} item${briefData.nonNegotiables.length !== 1 ? 's' : ''}` : '';
+      case 2: return briefData.needs.length > 0 ? `${briefData.needs.length} item${briefData.needs.length !== 1 ? 's' : ''}` : '';
+      case 3: return briefData.wants.length > 0 ? `${briefData.wants.length} item${briefData.wants.length !== 1 ? 's' : ''}` : '';
+      case 4: return briefData.niceToHaves.length > 0 ? `${briefData.niceToHaves.length} item${briefData.niceToHaves.length !== 1 ? 's' : ''}` : '';
+      case 5: return briefData.buyerStory ? 'Complete' : '';
+      case 6: return briefData.budgetCeiling && briefData.timeline ? 'Complete' : '';
+      default: return '';
     }
   };
 
-  const getDemoMatches = (): MatchResult[] => [
-    {
-      address: '2 Havilah Street',
-      suburb: 'Morisset Park',
-      price: '$850,000',
-      bedrooms: 4,
-      bathrooms: 2,
-      parking: 2,
-      score: 92,
-      hits: ['4 bedrooms', 'Modern kitchen', 'Large backyard', 'Close to schools'],
-      misses: ['No pool'],
-      liamNote: 'Excellent match with modern finishes and great family appeal.',
-    },
-    {
-      address: '15 Oak Avenue',
-      suburb: 'Morisset',
-      price: '$795,000',
-      bedrooms: 3,
-      bathrooms: 2,
-      parking: 2,
-      score: 78,
-      hits: ['3 bedrooms', 'Good location', 'Updated bathrooms'],
-      misses: ['Smaller block', 'Older kitchen'],
-      liamNote: 'Solid option with good bones and potential for updates.',
-    },
-    {
-      address: '42 Riverside Drive',
-      suburb: 'Morisset Park',
-      price: '$920,000',
-      bedrooms: 4,
-      bathrooms: 3,
-      parking: 3,
-      score: 88,
-      hits: ['4 bedrooms', 'Water views', 'Luxury finishes', 'Large garage'],
-      misses: ['Higher price point'],
-      liamNote: 'Premium option with exceptional views and modern amenities.',
-    },
-  ];
+  const formatBudget = (v: number) => {
+    if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+    return `$${(v / 1000).toFixed(0)}K`;
+  };
 
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-outfit text-2xl font-bold text-charcoal mb-2">Non-negotiables</h3>
-              <p className="font-figtree text-mid mb-4">What must the property have?</p>
+  const sliderPercent = ((budgetValue - 200000) / (3000000 - 200000)) * 100;
+
+  const handleSubmit = () => {
+    // Save brief data to sessionStorage for signup page
+    sessionStorage.setItem('briefData', JSON.stringify(briefData));
+    navigate('/signup');
+  };
+
+  return (
+    <div className="brief-page">
+      {/* Nav */}
+      <nav className="brief-nav">
+        <a href="/" className="brief-nav-brand" style={{ textDecoration: 'none' }}>
+          {/* BB Icon */}
+          <div style={{ position: 'relative', display: 'inline-block', width: 20, height: 24 }}>
+            <div
+              style={{
+                width: 20, height: 24, background: '#4A90D9', borderRadius: 4,
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute', top: '28%', left: '16%',
+                  display: 'flex', flexDirection: 'column', gap: '14%', width: '68%',
+                }}
+              >
+                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2 }} />
+                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2, width: '73%' }} />
+                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2, width: '85%' }} />
+                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2, width: '60%' }} />
+              </div>
+              <div
+                style={{
+                  position: 'absolute', top: '-28%', right: '-28%',
+                  width: 10, height: 10, background: '#E8B4B8', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <div style={{ width: 4, height: 4, background: '#F4F1EC', borderRadius: '50%' }} />
+              </div>
+            </div>
+          </div>
+          <span>
+            <b>Buyers</b> <em>BRIEF</em> <small>.COM.AU</small>
+          </span>
+        </a>
+        <div className="brief-nav-right">
+          <button
+            onClick={() => navigate('/')}
+            style={{ background: 'none', border: 'none', color: '#7FA8D4', cursor: 'pointer', fontFamily: "'Figtree', sans-serif", fontSize: 12 }}
+          >
+            Back to home
+          </button>
+        </div>
+      </nav>
+
+      {/* Main */}
+      <div className="brief-main">
+        {/* Liam Header */}
+        <div className="liam-header">
+          <div className="liam-av">L</div>
+          <div className="liam-bubble">
+            <div className="liam-bubble-name">LIAM</div>
+            <div className="liam-bubble-text">
+              Tell me what you're looking for. I'll search through our network — <em>on-market, off-market, and everything in between</em> — and find your <strong>perfect match</strong>.
+            </div>
+          </div>
+        </div>
+
+        {/* Step Cards */}
+        <div>
+          {/* Step 1: Non-negotiables */}
+          <StepCard
+            stepNum={1}
+            title="Non-negotiables"
+            subtitle="What must the property have?"
+            isActive={stepStates[1]}
+            isCompleted={completedSteps.has(1)}
+            isLocked={false}
+            summary={summary(1)}
+            onToggle={() => toggleStep(1)}
+          >
+            <div className="field-group">
+              <label className="field-label">DEAL-BREAKERS</label>
               <TagInput
                 tags={briefData.nonNegotiables}
-                onTagsChange={(tags) => setBriefData({ ...briefData, nonNegotiables: tags })}
-                placeholder="e.g. 4 bedrooms, Modern kitchen, Pool"
+                onTagsChange={(tags) => {
+                  setBriefData({ ...briefData, nonNegotiables: tags });
+                  if (tags.length > 0) markComplete(1);
+                }}
+                tagType="nn"
+                placeholder="e.g. 4 bedrooms, Double garage, North-facing"
+              />
+              <div className="field-hint">These are absolute requirements — no exceptions</div>
+            </div>
+            <div className="field-group">
+              <label className="field-label">ADDITIONAL NOTES</label>
+              <textarea
+                className="field-textarea"
+                placeholder="Any other must-haves or context..."
+                value={briefData.suburb ? '' : ''}
+                onChange={() => {}}
               />
             </div>
-          </div>
-        );
+            <div className="tier-labels">
+              <div className="tier-label">
+                <div className="tier-dot" style={{ background: '#E8614A' }} />
+                <span>All tiers</span>
+              </div>
+            </div>
+          </StepCard>
 
-      case 2:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-outfit text-2xl font-bold text-charcoal mb-2">Needs (40% weight)</h3>
-              <p className="font-figtree text-mid mb-4">What do you really want?</p>
+          {/* Step 2: Needs */}
+          <StepCard
+            stepNum={2}
+            title="Needs (40% weight)"
+            subtitle="What do you really need?"
+            isActive={stepStates[2]}
+            isCompleted={completedSteps.has(2)}
+            isLocked={false}
+            summary={summary(2)}
+            onToggle={() => toggleStep(2)}
+          >
+            <div className="field-group">
+              <label className="field-label">IMPORTANT FEATURES</label>
               <TagInput
                 tags={briefData.needs}
-                onTagsChange={(tags) => setBriefData({ ...briefData, needs: tags })}
-                placeholder="e.g. Large backyard, Close to schools, Modern finishes"
+                onTagsChange={(tags) => {
+                  setBriefData({ ...briefData, needs: tags });
+                  if (tags.length > 0) markComplete(2);
+                }}
+                tagType="need"
+                placeholder="e.g. Close to schools, Modern kitchen, Flat block"
               />
+              <div className="field-hint">Strongly preferred — weighted 40% in matching</div>
             </div>
-          </div>
-        );
+            <div className="tier-labels">
+              <div className="tier-label">
+                <div className="tier-dot" style={{ background: '#4A90D9' }} />
+                <span>Tier 1+</span>
+              </div>
+            </div>
+          </StepCard>
 
-      case 3:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-outfit text-2xl font-bold text-charcoal mb-2">Wants (35% weight)</h3>
-              <p className="font-figtree text-mid mb-4">What would be nice to have?</p>
+          {/* Step 3: Wants */}
+          <StepCard
+            stepNum={3}
+            title="Wants (35% weight)"
+            subtitle="What would be nice to have?"
+            isActive={stepStates[3]}
+            isCompleted={completedSteps.has(3)}
+            isLocked={false}
+            summary={summary(3)}
+            onToggle={() => toggleStep(3)}
+          >
+            <div className="field-group">
+              <label className="field-label">DESIRED FEATURES</label>
               <TagInput
                 tags={briefData.wants}
-                onTagsChange={(tags) => setBriefData({ ...briefData, wants: tags })}
-                placeholder="e.g. Pool, Gym, Home office, Outdoor entertaining"
+                onTagsChange={(tags) => {
+                  setBriefData({ ...briefData, wants: tags });
+                  if (tags.length > 0) markComplete(3);
+                }}
+                tagType="want"
+                placeholder="e.g. Pool, Ensuite, Walk-in wardrobe"
               />
+              <div className="field-hint">Would love to have — weighted 35% in matching</div>
             </div>
-          </div>
-        );
+            <div className="tier-labels">
+              <div className="tier-label">
+                <div className="tier-dot" style={{ background: '#E8B4B8' }} />
+                <span>Tier 2+</span>
+              </div>
+            </div>
+          </StepCard>
 
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-outfit text-2xl font-bold text-charcoal mb-2">Nice-to-haves (25% weight)</h3>
-              <p className="font-figtree text-mid mb-4">What would make it perfect?</p>
+          {/* Step 4: Nice-to-haves */}
+          <StepCard
+            stepNum={4}
+            title="Nice-to-haves (25% weight)"
+            subtitle="What would make it perfect?"
+            isActive={stepStates[4]}
+            isCompleted={completedSteps.has(4)}
+            isLocked={false}
+            summary={summary(4)}
+            onToggle={() => toggleStep(4)}
+          >
+            <div className="field-group">
+              <label className="field-label">BONUS FEATURES</label>
               <TagInput
                 tags={briefData.niceToHaves}
-                onTagsChange={(tags) => setBriefData({ ...briefData, niceToHaves: tags })}
+                onTagsChange={(tags) => {
+                  setBriefData({ ...briefData, niceToHaves: tags });
+                  if (tags.length > 0) markComplete(4);
+                }}
+                tagType="nth"
                 placeholder="e.g. Smart home, Wine cellar, Tennis court"
               />
+              <div className="field-hint">The cherry on top — weighted 25% in matching</div>
             </div>
-          </div>
-        );
+            <div className="tier-labels">
+              <div className="tier-label">
+                <div className="tier-dot" style={{ background: '#4CAF7D' }} />
+                <span>Tier 2+</span>
+              </div>
+            </div>
+          </StepCard>
 
-      case 5:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-outfit text-2xl font-bold text-charcoal mb-2">Your story</h3>
-              <p className="font-figtree text-mid mb-4">Tell us about yourself and why you're buying</p>
+          {/* Step 5: Buyer Story */}
+          <StepCard
+            stepNum={5}
+            title="Your story"
+            subtitle="Tell us about yourself"
+            isActive={stepStates[5]}
+            isCompleted={completedSteps.has(5)}
+            isLocked={false}
+            summary={summary(5)}
+            onToggle={() => toggleStep(5)}
+          >
+            <div className="field-group">
+              <label className="field-label">WHY ARE YOU BUYING?</label>
               <textarea
+                className="field-textarea"
                 value={briefData.buyerStory}
-                onChange={(e) => setBriefData({ ...briefData, buyerStory: e.target.value })}
+                onChange={(e) => {
+                  setBriefData({ ...briefData, buyerStory: e.target.value });
+                  if (e.target.value.length > 10) markComplete(5);
+                }}
                 placeholder="e.g. Growing family, need more space. First home buyers looking for investment potential..."
-                className="w-full font-figtree text-sm font-normal text-charcoal bg-offwhite border border-transparent rounded-lg p-3 outline-none transition-all focus:border-sky focus:bg-white min-h-32 resize-none"
               />
+              <div className="field-hint">Help Liam understand your situation and priorities</div>
             </div>
-          </div>
-        );
+          </StepCard>
 
-      case 6:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-outfit text-2xl font-bold text-charcoal mb-4">Budget & Timeline</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="font-figtree text-sm font-medium text-charcoal mb-2 block">Budget ceiling</label>
-                  <Input
-                    type="text"
-                    placeholder="e.g. $850,000"
-                    value={briefData.budgetCeiling}
-                    onChange={(e) => setBriefData({ ...briefData, budgetCeiling: e.target.value })}
-                    className="w-full font-figtree text-sm font-normal text-charcoal bg-offwhite border border-transparent rounded-lg p-2.5 outline-none transition-all focus:border-sky focus:bg-white"
-                  />
-                </div>
+          {/* Step 6: Budget & Timeline */}
+          <StepCard
+            stepNum={6}
+            title="Budget & timeline"
+            subtitle="When and how much?"
+            isActive={stepStates[6]}
+            isCompleted={completedSteps.has(6)}
+            isLocked={false}
+            summary={summary(6)}
+            onToggle={() => toggleStep(6)}
+          >
+            <div className="field-group">
+              <label className="field-label">BUDGET CEILING</label>
+              <div className="budget-display">
+                <span>$</span>{formatBudget(budgetValue).replace('$', '')}
+              </div>
+              <input
+                type="range"
+                min={200000}
+                max={3000000}
+                step={25000}
+                value={budgetValue}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setBudgetValue(val);
+                  setBriefData({ ...briefData, budgetCeiling: formatBudget(val) });
+                }}
+                style={{
+                  background: `linear-gradient(to right, #4A90D9 0%, #4A90D9 ${sliderPercent}%, rgba(127,168,212,0.2) ${sliderPercent}%)`,
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                <span className="field-hint">$200K</span>
+                <span className="field-hint">$3M+</span>
+              </div>
+            </div>
 
-                <div>
-                  <label className="font-figtree text-sm font-medium text-charcoal mb-2 block">Timeline</label>
-                  <select
-                    value={briefData.timeline}
-                    onChange={(e) => setBriefData({ ...briefData, timeline: e.target.value })}
-                    className="w-full font-figtree text-sm font-normal text-charcoal bg-offwhite border border-transparent rounded-lg p-2.5 outline-none transition-all focus:border-sky focus:bg-white"
-                  >
-                    <option value="">Select...</option>
-                    <option value="immediate">Immediate (0-3 months)</option>
-                    <option value="soon">Soon (3-6 months)</option>
-                    <option value="flexible">Flexible (6-12 months)</option>
-                    <option value="exploring">Just exploring</option>
-                  </select>
-                </div>
+            <div className="field-row">
+              <div className="field-group">
+                <label className="field-label">TIMELINE</label>
+                <select
+                  className="field-select"
+                  value={briefData.timeline}
+                  onChange={(e) => {
+                    setBriefData({ ...briefData, timeline: e.target.value });
+                    if (e.target.value && briefData.budgetCeiling) markComplete(6);
+                  }}
+                >
+                  <option value="">Select...</option>
+                  <option value="immediate">Immediate (0-3 months)</option>
+                  <option value="soon">Soon (3-6 months)</option>
+                  <option value="flexible">Flexible (6-12 months)</option>
+                  <option value="exploring">Just exploring</option>
+                </select>
               </div>
 
-              <div>
-                <label className="font-figtree text-sm font-medium text-charcoal mb-2 block">Finance status</label>
+              <div className="field-group">
+                <label className="field-label">FINANCE STATUS</label>
                 <select
+                  className="field-select"
                   value={briefData.financeStatus}
                   onChange={(e) => setBriefData({ ...briefData, financeStatus: e.target.value })}
-                  className="w-full font-figtree text-sm font-normal text-charcoal bg-offwhite border border-transparent rounded-lg p-2.5 outline-none transition-all focus:border-sky focus:bg-white"
                 >
                   <option value="">Select...</option>
                   <option value="preapproved">Pre-approved</option>
@@ -355,168 +504,24 @@ export default function BriefIntake() {
                 </select>
               </div>
             </div>
-          </div>
-        );
 
-      case 7:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-outfit text-2xl font-bold text-charcoal mb-2">Your matches</h3>
-              <p className="font-figtree text-mid mb-6">Liam found {matches.length} properties that match your brief</p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {matches.map((match, idx) => (
-                  <Card key={idx} className="p-6 border border-rose border-opacity-10 hover:border-opacity-30 transition-all">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h4 className="font-outfit font-bold text-charcoal text-lg">{match.address}</h4>
-                        <p className="font-figtree text-sm text-mid">{match.suburb}</p>
-                      </div>
-                      <ScoreRing score={match.score} />
-                    </div>
-
-                    <div className="mb-4">
-                      <p className="font-outfit font-bold text-sky text-xl">{match.price}</p>
-                      <p className="font-figtree text-sm text-mid">
-                        {match.bedrooms} bed • {match.bathrooms} bath • {match.parking} car
-                      </p>
-                    </div>
-
-                    <div className="mb-4 space-y-2">
-                      <div>
-                        <p className="font-figtree text-xs font-medium text-green-600 mb-1">✓ Hits</p>
-                        <div className="flex flex-wrap gap-2">
-                          {match.hits.map((hit, i) => (
-                            <span key={i} className="bg-green-50 text-green-700 text-xs px-2 py-1 rounded">
-                              {hit}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-figtree text-xs font-medium text-rose mb-1">✗ Misses</p>
-                        <div className="flex flex-wrap gap-2">
-                          {match.misses.map((miss, i) => (
-                            <span key={i} className="bg-rose bg-opacity-10 text-rose text-xs px-2 py-1 rounded">
-                              {miss}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-offwhite p-3 rounded-lg mb-4">
-                      <p className="font-figtree text-sm text-charcoal italic">"{match.liamNote}"</p>
-                      <p className="font-figtree text-xs text-mid mt-2">— Liam</p>
-                    </div>
-
-                    <Button className="w-full bg-sky text-white hover:bg-sky-dark">
-                      Add to hotlist
-                    </Button>
-                  </Card>
-                ))}
+            <div className="tier-labels">
+              <div className="tier-label">
+                <div className="tier-dot" style={{ background: '#4A90D9' }} />
+                <span>All tiers</span>
               </div>
             </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="bg-offwhite text-charcoal min-h-screen">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-offwhite bg-opacity-95 backdrop-blur-md border-b border-rose border-opacity-20 px-4 sm:px-8 md:px-12 h-16 sm:h-17 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2 sm:gap-3 no-underline">
-          <BBIcon size="md" />
-          <div className="flex flex-col leading-none">
-            <div className="font-outfit text-lg sm:text-xl font-bold text-charcoal tracking-tighter">Buyers</div>
-            <div className="flex items-baseline gap-0">
-              <div className="font-outfit text-lg sm:text-xl font-light text-sky tracking-wider">Brief</div>
-              <div className="font-outfit text-2xs font-light text-sky tracking-wider ml-0.5 mb-0.5">.COM.AU</div>
-            </div>
-          </div>
-        </a>
-
-        <button
-          onClick={() => navigate('/')}
-          className="font-figtree text-sm text-mid hover:text-charcoal transition-colors"
-        >
-          Back
-        </button>
-      </nav>
-
-      {/* Main Content */}
-      <div className="pt-20 pb-12 px-4 sm:px-8 md:px-12 lg:px-18">
-        <div className="max-w-2xl mx-auto">
-          {/* Progress */}
-          {step < 7 && (
-            <div className="mb-12">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-outfit text-2xl sm:text-3xl font-bold text-charcoal">Your brief</h2>
-                <p className="font-figtree text-sm text-mid">Step {step} of 6</p>
-              </div>
-              <div className="w-full bg-offwhite rounded-full h-2">
-                <div
-                  className="bg-sky h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(step / 6) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Step Content */}
-          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-rose border-opacity-10 mb-8">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-sky animate-spin mb-4" />
-                <p className="font-figtree text-mid">Liam is searching for your perfect matches...</p>
-              </div>
-            ) : (
-              renderStep()
-            )}
-          </div>
-
-          {/* Navigation Buttons */}
-          {step < 7 && !loading && (
-            <div className="flex gap-4">
-              <Button
-                onClick={() => setStep(Math.max(1, step - 1))}
-                disabled={step === 1}
-                className="flex-1 bg-offwhite text-charcoal border border-rose border-opacity-20 hover:border-opacity-50 disabled:opacity-50"
-              >
-                Back
-              </Button>
-              <Button
-                onClick={() => {
-                  if (step === 6) {
-                    handleSubmit();
-                  } else {
-                    setStep(step + 1);
-                  }
-                }}
-                className="flex-1 bg-sky text-white hover:bg-sky-dark"
-              >
-                {step === 6 ? 'Find matches' : 'Next'}
-              </Button>
-            </div>
-          )}
-
-          {/* Results Navigation */}
-          {step === 7 && (
-            <div className="flex gap-4">
-              <Button
-                onClick={() => navigate('/signup')}
-                className="flex-1 bg-sky text-white hover:bg-sky-dark"
-              >
-                Continue to signup
-              </Button>
-            </div>
-          )}
+          </StepCard>
         </div>
+
+        {/* Submit Button */}
+        <button className="step-cta" onClick={handleSubmit} style={{ marginTop: 16 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          Find my matches
+        </button>
       </div>
     </div>
   );
