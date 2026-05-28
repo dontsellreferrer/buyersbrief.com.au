@@ -39,13 +39,13 @@
 ## PHASE 2: FRONTEND PAGES & COMPONENTS
 
 ### Homepage (index.html → Home.tsx)
-- [ ] Pixel-faithful reproduction of hero section
-- [ ] Brief basics entry card (suburb, property type, beds, baths, parking, budget)
-- [ ] "How it works" section with 6 steps
-- [ ] Pricing tiers display (Tier 1, Tier 2, Tier 3)
-- [ ] Footer with links
-- [ ] Responsive design (mobile, tablet, desktop)
-- [ ] Navigation bar with logo and CTA buttons
+- [x] Pixel-faithful reproduction of hero section
+- [x] Brief basics entry card (suburb, property type, beds, baths, parking, budget)
+- [x] "How it works" section with 6 steps
+- [x] Pricing tiers display (Tier 1, Tier 2, Tier 3)
+- [x] Footer with links
+- [x] Responsive design (mobile, tablet, desktop)
+- [x] Navigation bar with logo and CTA buttons
 
 ### Brief Intake Form (brief.html → BriefIntake.tsx)
 - [ ] Step 1: Non-negotiables (tag input, free text)
@@ -254,4 +254,19 @@
 
 ## COMPLETED ITEMS
 
-(None yet — project initialization in progress)
+### Infrastructure
+- [x] Supabase project created and connected
+- [x] GitHub repository created and initialized
+- [x] Cloudflare DNS configured with CNAME record
+- [x] Railway project created and deployed
+- [x] Environment variables configured (DATABASE_URL, NODE_ENV, OPENAI_API_KEY)
+- [x] SSL/TLS certificate auto-issued by Cloudflare
+- [x] Automatic Git-based deployments enabled
+
+### Frontend
+- [x] Homepage built pixel-faithfully with all sections (hero, brief card, how-it-works, pricing, why us, Liam quote, footer)
+- [x] Navigation bar with logo and CTA buttons
+- [x] Brief intake card with form fields (suburb, property type, beds, baths, parking, budget)
+- [x] Form submission stores data in sessionStorage and navigates to /brief
+- [x] Responsive design implemented with Tailwind CSS
+- [x] Custom BB icon component created and used throughout
