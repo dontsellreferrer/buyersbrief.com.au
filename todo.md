@@ -48,21 +48,21 @@
 - [x] Navigation bar with logo and CTA buttons
 
 ### Brief Intake Form (brief.html → BriefIntake.tsx)
-- [ ] Step 1: Non-negotiables (tag input, free text)
-- [ ] Step 2: Needs (tag input, weighted 40%)
-- [ ] Step 3: Wants (tag input, weighted 35%)
-- [ ] Step 4: Nice-to-haves (tag input, weighted 25%)
-- [ ] Step 5: Buyer story (free text field)
-- [ ] Step 6: Budget and timeline (select fields, finance status)
-- [ ] Progress indicator showing 6 steps
+- [x] Step 1: Non-negotiables (tag input, free text)
+- [x] Step 2: Needs (tag input, weighted 40%)
+- [x] Step 3: Wants (tag input, weighted 35%)
+- [x] Step 4: Nice-to-haves (tag input, weighted 25%)
+- [x] Step 5: Buyer story (free text field)
+- [x] Step 6: Budget and timeline (select fields, finance status)
+- [x] Progress indicator showing 6 steps
 - [ ] Form validation and error handling
 - [ ] Prompt construction from form data
 - [ ] Claude API call with web search enabled
-- [ ] Results rendering with score ring cards
-- [ ] Hit/miss breakdown per property
-- [ ] Liam's one-line note per property
-- [ ] Fallback demo data if API fails
-- [ ] "Add to hotlist" button on each result card
+- [x] Results rendering with score ring cards
+- [x] Hit/miss breakdown per property
+- [x] Liam's one-line note per property
+- [x] Fallback demo data if API fails
+- [x] "Add to hotlist" button on each result card
 
 ### Signup & Onboarding (signup.html → Signup.tsx)
 - [ ] Step 1: Show blurred results teaser
