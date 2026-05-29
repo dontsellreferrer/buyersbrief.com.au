@@ -367,17 +367,36 @@ export default function BriefIntake() {
                     key={opt}
                     type="button"
                     onClick={() => setBriefData({ ...briefData, intent: opt })}
-                    className="field-input"
+                    className="field-input flex items-center justify-center gap-2"
                     style={{
                       background: briefData.intent === opt ? '#4A90D9' : '#F4F1EC',
                       color: briefData.intent === opt ? 'white' : '#1E1E1E',
                       border: `1.5px solid ${briefData.intent === opt ? '#4A90D9' : 'rgba(232,180,184,0.2)'}`,
                       cursor: 'pointer',
                       fontWeight: 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
                     }}
                   >
-                    {opt === 'live' && '🏠 Live in'}
-                    {opt === 'invest' && '📈 Invest'}
+                    {opt === 'live' && (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                          <path d="M1 6.5L7 1.5l6 5V13H9V9H5v4H1V6.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Live in
+                      </>
+                    )}
+                    {opt === 'invest' && (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                          <path d="M1 10.5l3.5-4 2.5 2.5 3-4 2.5 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M10 4h3v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Invest
+                      </>
+                    )}
                     {opt === 'both' && 'Both'}
                   </button>
                 ))}
