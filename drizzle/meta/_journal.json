@@ -1,19 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
       "version": "5",
-      "when": 1779939683616,
-      "tag": "0000_handy_guardian",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1780036800000,
-      "tag": "0001_jwt_auth_migration",
+      "when": 1780050000000,
+      "tag": "0000_initial_pg_schema",
       "breakpoints": true
     }
   ]

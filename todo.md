@@ -283,3 +283,16 @@
 - [x] Remove VITE_OAUTH_PORTAL_URL dependency
 - [x] Test auth flow locally (all 10 vitest tests passing)
 - [ ] Push to git and verify Railway deployment works
+
+## PostgreSQL Migration (Supabase) — Zero Manus Dependency
+- [ ] Convert drizzle/schema.ts from mysql-core to pg-core
+- [ ] Switch database driver from mysql2 to postgres-js
+- [ ] Update drizzle.config.ts for PostgreSQL dialect
+- [ ] Update server/db.ts for PostgreSQL driver
+- [ ] Apply migration to Supabase database
+- [ ] Test auth flow against Supabase locally
+- [ ] Add JWT_SECRET to Railway env vars
+- [ ] Remove OAUTH_SERVER_URL from Railway
+- [ ] Remove VITE_OAUTH_PORTAL_URL from Railway
+- [ ] Push to GitHub and verify Railway deployment
+- [ ] Remove all remaining Manus API/infrastructure references from codebase

@@ -1,25 +1,28 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { integer, pgEnum, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing JWT auth flow.
  * Users sign up with email/password.
  */
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const tierEnum = pgEnum("tier", ["free", "tier1", "tier2", "tier3"]);
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   email: varchar("email", { length: 320 }).notNull().unique(),
-  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
-  firstName: varchar("firstName", { length: 100 }),
-  lastName: varchar("lastName", { length: 100 }),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
   mobile: varchar("mobile", { length: 20 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  tier: mysqlEnum("tier", ["free", "tier1", "tier2", "tier3"]).default("free").notNull(),
-  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
-  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
-  brokerReferral: text("brokerReferral"),
-  smsConsent: int("smsConsent").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  role: roleEnum("role").default("user").notNull(),
+  tier: tierEnum("tier").default("free").notNull(),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  brokerReferral: text("broker_referral"),
+  smsConsent: integer("sms_consent").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
