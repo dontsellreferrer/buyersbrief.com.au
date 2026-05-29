@@ -282,17 +282,24 @@
 - [x] Remove Manus OAuth code (oauth.ts, const.ts login URL, ManusDialog)
 - [x] Remove VITE_OAUTH_PORTAL_URL dependency
 - [x] Test auth flow locally (all 10 vitest tests passing)
-- [ ] Push to git and verify Railway deployment works
+- [x] Push to git and verify Railway deployment works
 
 ## PostgreSQL Migration (Supabase) — Zero Manus Dependency
-- [ ] Convert drizzle/schema.ts from mysql-core to pg-core
-- [ ] Switch database driver from mysql2 to postgres-js
-- [ ] Update drizzle.config.ts for PostgreSQL dialect
-- [ ] Update server/db.ts for PostgreSQL driver
-- [ ] Apply migration to Supabase database
-- [ ] Test auth flow against Supabase locally
-- [ ] Add JWT_SECRET to Railway env vars
-- [ ] Remove OAUTH_SERVER_URL from Railway
-- [ ] Remove VITE_OAUTH_PORTAL_URL from Railway
-- [ ] Push to GitHub and verify Railway deployment
-- [ ] Remove all remaining Manus API/infrastructure references from codebase
+- [x] Convert drizzle/schema.ts from mysql-core to pg-core
+- [x] Switch database driver from mysql2 to postgres-js
+- [x] Update drizzle.config.ts for PostgreSQL dialect
+- [x] Update server/db.ts for PostgreSQL driver
+- [x] Apply migration to Supabase database
+- [x] Test auth flow against Supabase locally
+- [x] Add JWT_SECRET to Railway env vars
+- [x] Remove OAUTH_SERVER_URL from Railway
+- [x] Remove VITE_OAUTH_PORTAL_URL from Railway
+- [x] Push to GitHub and verify Railway deployment
+- [x] Remove all remaining Manus API/infrastructure references from codebase
+
+## Manus Cleanup — Remove All Remaining References
+- [x] Remove Manus OAuth stub (server/_core/oauth.ts, registerOAuthRoutes)
+- [x] Remove Manus storage proxy (server/_core/storageProxy.ts, registerStorageProxy)
+- [x] Remove Forge API env references (forgeApiUrl, forgeApiKey from env.ts)
+- [x] Remove /manus-storage asset references from components
+- [x] Audit codebase for any remaining 'manus', 'forge', 'oauth' references
