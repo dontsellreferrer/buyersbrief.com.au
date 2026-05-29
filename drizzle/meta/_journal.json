@@ -8,6 +8,13 @@
       "when": 1779939683616,
       "tag": "0000_handy_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1780036800000,
+      "tag": "0001_jwt_auth_migration",
+      "breakpoints": true
     }
   ]
 }

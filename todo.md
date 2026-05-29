@@ -270,3 +270,16 @@
 - [x] Form submission stores data in sessionStorage and navigates to /brief
 - [x] Responsive design implemented with Tailwind CSS
 - [x] Custom BB icon component created and used throughout
+
+## JWT Authentication (Replace Manus OAuth)
+- [x] Install bcrypt and jsonwebtoken packages
+- [x] Update user table schema to include password_hash field
+- [x] Create auth endpoints: signup, login, logout, me
+- [x] Implement JWT token generation and validation
+- [x] Create login page UI
+- [x] Create signup page UI
+- [x] Update useAuth hook to use JWT instead of Manus OAuth
+- [x] Remove Manus OAuth code (oauth.ts, const.ts login URL, ManusDialog)
+- [x] Remove VITE_OAUTH_PORTAL_URL dependency
+- [x] Test auth flow locally (all 10 vitest tests passing)
+- [ ] Push to git and verify Railway deployment works
