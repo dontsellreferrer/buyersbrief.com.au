@@ -131,6 +131,13 @@ export default function Home() {
             </a>
           ))}
           <a
+            href="/login"
+            className="no-underline"
+            style={{ fontFamily: "'Figtree',sans-serif", fontSize: 16, fontWeight: 500, color: "#7FA8D4" }}
+          >
+            Sign in
+          </a>
+          <a
             href="/brief"
             className="flex items-center gap-2 no-underline text-white mt-4"
             style={{
