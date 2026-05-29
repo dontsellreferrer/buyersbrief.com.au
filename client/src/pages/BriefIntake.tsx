@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { BBIcon } from '@/components/BBIcon';
+import { Logo } from '@/components/Logo';
 
 interface BriefData {
   suburb: string;
@@ -211,12 +211,9 @@ export default function BriefIntake() {
     <div className="brief-page">
       {/* Nav */}
       <nav className="brief-nav">
-        <a href="/" className="brief-nav-brand" style={{ textDecoration: 'none' }}>
-          <BBIcon docWidth={20} docHeight={24} />
-          <span>
-            <b>Buyers</b> <em>BRIEF</em> <small>.COM.AU</small>
-          </span>
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Logo size="nav" variant="dark" />
+        </div>
         <div className="brief-nav-right">
           <button
             onClick={() => navigate('/')}

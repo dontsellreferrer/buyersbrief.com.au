@@ -1,44 +1,45 @@
-import { BBIcon } from "./BBIcon";
+/**
+ * Logo Component — Official Buyers Brief wordmark logo
+ * Uses the SVG (colour) version on light backgrounds (nav on homepage)
+ * Uses the white PNG version on dark backgrounds (footer, brief page nav)
+ * 
+ * Per Brand Bible v1.0:
+ * - Primary colour logo on off-white, white, or very light backgrounds
+ * - White logo on charcoal (#1E1E1E), dark navy, or any dark background
+ */
 
 interface LogoProps {
   size?: "nav" | "footer";
+  variant?: "light" | "dark"; // light = colour logo on light bg, dark = white logo on dark bg
 }
 
-export function Logo({ size = "nav" }: LogoProps) {
+export function Logo({ size = "nav", variant }: LogoProps) {
   const isFooter = size === "footer";
-  const fontSize = isFooter ? "text-[18px]" : "text-[20px]";
-  const comauSize = isFooter ? "text-[8px]" : "text-[9px]";
+  
+  // Determine which logo to use:
+  // - If variant is explicitly set, use that
+  // - Otherwise, footer defaults to dark (white logo), nav defaults to light (colour logo)
+  const useDarkVariant = variant === "dark" || (!variant && isFooter);
+  
+  const src = useDarkVariant ? "/bb-logo-white.webp" : "/bb-logo.svg";
+  
+  // The SVG has a tight viewBox (650x165) so height maps well to visible content.
+  // The webp is 1330x330 with content at 1290x290 — aspect ratio ~4.4:1
+  // At height=36px the webp renders ~158px wide which is good for nav.
+  // For footer, slightly smaller is fine.
+  const height = isFooter ? 36 : 40;
 
   return (
-    <a href="/" className="flex items-center gap-3 no-underline">
-      <BBIcon
-        docWidth={isFooter ? 16 : 20}
-        docHeight={isFooter ? 20 : 25}
-        pinSize={isFooter ? 8 : 10}
-        pinInnerSize={isFooter ? 3.5 : 4.5}
+    <a href="/" className="flex items-center no-underline">
+      <img
+        src={src}
+        alt="buyersbrief.com.au"
+        style={{
+          height: `${height}px`,
+          width: 'auto',
+          display: 'block',
+        }}
       />
-      <div className="flex flex-col leading-none">
-        <span
-          className={`font-outfit ${fontSize} font-bold tracking-[-0.5px]`}
-          style={{ color: isFooter ? "#F4F1EC" : "#1E1E1E" }}
-        >
-          Buyers
-        </span>
-        <div className="flex items-baseline">
-          <span
-            className={`font-outfit ${fontSize} font-light tracking-[2px]`}
-            style={{ color: "#4A90D9" }}
-          >
-            BRIEF
-          </span>
-          <span
-            className={`font-outfit ${comauSize} font-light tracking-[1.5px] ml-0.5 self-end`}
-            style={{ color: "#4A90D9" }}
-          >
-            .COM.AU
-          </span>
-        </div>
-      </div>
     </a>
   );
 }
