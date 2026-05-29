@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
+import { BBIcon } from '@/components/BBIcon';
 
 interface BriefData {
   suburb: string;
@@ -211,36 +212,7 @@ export default function BriefIntake() {
       {/* Nav */}
       <nav className="brief-nav">
         <a href="/" className="brief-nav-brand" style={{ textDecoration: 'none' }}>
-          {/* BB Icon */}
-          <div style={{ position: 'relative', display: 'inline-block', width: 20, height: 24 }}>
-            <div
-              style={{
-                width: 20, height: 24, background: '#4A90D9', borderRadius: 4,
-                position: 'relative',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute', top: '28%', left: '16%',
-                  display: 'flex', flexDirection: 'column', gap: '14%', width: '68%',
-                }}
-              >
-                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2 }} />
-                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2, width: '73%' }} />
-                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2, width: '85%' }} />
-                <div style={{ background: 'rgba(244,241,236,0.75)', borderRadius: 2, height: 2, width: '60%' }} />
-              </div>
-              <div
-                style={{
-                  position: 'absolute', top: '-28%', right: '-28%',
-                  width: 10, height: 10, background: '#E8B4B8', borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <div style={{ width: 4, height: 4, background: '#F4F1EC', borderRadius: '50%' }} />
-              </div>
-            </div>
-          </div>
+          <BBIcon docWidth={20} docHeight={24} />
           <span>
             <b>Buyers</b> <em>BRIEF</em> <small>.COM.AU</small>
           </span>

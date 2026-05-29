@@ -1,50 +1,47 @@
 /**
- * BB Icon Component — matches the prototype's custom document+pin icon
- * Used throughout the site at various sizes.
+ * BB Icon Component — Official Buyers Brief logo
+ * Uses the PNG asset from Brand Bible v1.0
+ * Document icon + dusty rose checkmark
+ * 
+ * Scales cleanly at any size via docWidth/docHeight props
  */
 
 interface BBIconProps {
-  /** Width of the document part in px */
+  /** Width of the icon in px (scales proportionally) */
   docWidth?: number;
-  /** Height of the document part in px */
+  /** Height of the icon in px (scales proportionally) */
   docHeight?: number;
-  /** Width of the pin circle in px */
+  /** Unused — kept for backwards compatibility */
   pinSize?: number;
-  /** Width of the inner pin dot in px */
+  /** Unused — kept for backwards compatibility */
   pinInnerSize?: number;
   className?: string;
 }
 
 export function BBIcon({
-  docWidth = 18,
-  docHeight = 23,
-  pinSize = 9,
-  pinInnerSize = 4,
+  docWidth = 24,
+  docHeight = 32,
+  pinSize,
+  pinInnerSize,
   className = "",
 }: BBIconProps) {
+  // Use docWidth/docHeight as the actual display size
+  // The PNG scales perfectly at any size
+  const width = docWidth;
+  const height = docHeight;
+
   return (
-    <span className={`bb-icon ${className}`}>
-      <span
-        className="doc"
-        style={{ width: docWidth, height: docHeight }}
-      >
-        <span className="doc-lines">
-          <span className="doc-line" />
-          <span className="doc-line" />
-          <span className="doc-line" />
-          <span className="doc-line" />
-        </span>
-      </span>
-      <span
-        className="pin"
-        style={{ width: pinSize, height: pinSize }}
-      >
-        <span
-          className="pin-inner"
-          style={{ width: pinInnerSize, height: pinInnerSize }}
-        />
-      </span>
-    </span>
+    <img
+      src="/bb-icon.png"
+      alt="Buyers Brief"
+      width={width}
+      height={height}
+      className={className}
+      style={{
+        display: 'inline-block',
+        objectFit: 'contain',
+      }}
+    />
   );
 }
 
