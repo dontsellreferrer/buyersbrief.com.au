@@ -28,4 +28,37 @@ export const users = pgTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add briefs, matches, hotlist, cmas tables here
+/**
+ * Briefs table — stores property search briefs from users
+ */
+export const intentEnum = pgEnum("purchase_intent", ["live", "invest", "both"]);
+
+export const briefs = pgTable("briefs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  suburbs: text("suburbs"),
+  type: varchar("type", { length: 50 }),
+  beds: varchar("beds", { length: 50 }),
+  baths: varchar("baths", { length: 50 }),
+  parking: varchar("parking", { length: 50 }),
+  budgetDisplay: varchar("budget_display", { length: 50 }),
+  budget: integer("budget"),
+  purchaseIntent: intentEnum("purchase_intent").default("live").notNull(),
+  flex: text("flex"),
+  nonNegotiables: text("non_negotiables"),
+  needs: text("needs"),
+  wants: text("wants"),
+  niceToHaves: text("nice_to_haves"),
+  story: text("story"),
+  finance: text("finance"),
+  timeline: text("timeline"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Brief = typeof briefs.$inferSelect;
+export type InsertBrief = typeof briefs.$inferInsert;
+
+// TODO: Add matches, hotlist, cmas tables here

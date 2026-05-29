@@ -9,6 +9,7 @@ interface BriefData {
   baths: string;
   parking: string;
   budget: string;
+  intent: 'live' | 'invest' | 'both';
   nonNegotiables: string[];
   needs: string[];
   wants: string[];
@@ -144,13 +145,14 @@ function StepCard({
 
 /* ── Main Component ── */
 export default function BriefIntake() {
+  const [location] = useLocation();
   const [, navigate] = useLocation();
   const [stepStates, setStepStates] = useState<Record<number, boolean>>({
-    1: true, 2: false, 3: false, 4: false, 5: false, 6: false,
+    0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: false,
   });
 
   const [briefData, setBriefData] = useState<BriefData>({
-    suburb: '', propertyType: '', beds: '', baths: '', parking: '', budget: '',
+    suburb: '', propertyType: '', beds: '', baths: '', parking: '', budget: '', intent: 'live',
     nonNegotiables: [], needs: [], wants: [], niceToHaves: [],
     buyerStory: '', budgetCeiling: '', timeline: '', financeStatus: '',
   });
@@ -158,16 +160,37 @@ export default function BriefIntake() {
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [budgetValue, setBudgetValue] = useState(850000);
 
-  // Load brief basics from sessionStorage (from homepage card)
+  // Load brief basics from URL params or sessionStorage
   useEffect(() => {
-    const saved = sessionStorage.getItem('briefBasics');
-    if (saved) {
-      try {
-        const basics = JSON.parse(saved);
-        setBriefData((prev) => ({ ...prev, ...basics }));
-      } catch { /* ignore */ }
+    const params = new URLSearchParams(location.split('?')[1] || '');
+    const urlData: Partial<BriefData> = {};
+    
+    if (params.get('suburbs')) urlData.suburb = params.get('suburbs')!;
+    if (params.get('type')) urlData.propertyType = params.get('type')!;
+    if (params.get('beds')) urlData.beds = params.get('beds')!;
+    if (params.get('baths')) urlData.baths = params.get('baths')!;
+    if (params.get('parking')) urlData.parking = params.get('parking')!;
+    if (params.get('budget')) urlData.budget = params.get('budget')!;
+    if (params.get('intent')) urlData.intent = params.get('intent') as 'live' | 'invest' | 'both';
+
+    if (Object.keys(urlData).length > 0) {
+      setBriefData((prev) => ({ ...prev, ...urlData }));
+      // Auto-advance to Step 1 if suburbs, beds, and budget are all present
+      if (urlData.suburb && urlData.beds && urlData.budget) {
+        setStepStates({ 0: false, 1: true, 2: false, 3: false, 4: false, 5: false, 6: false });
+        setCompletedSteps(new Set([0]));
+      }
+    } else {
+      // Load from sessionStorage if no URL params
+      const saved = sessionStorage.getItem('briefBasics');
+      if (saved) {
+        try {
+          const basics = JSON.parse(saved);
+          setBriefData((prev) => ({ ...prev, ...basics }));
+        } catch { /* ignore */ }
+      }
     }
-  }, []);
+  }, [location]);
 
   const toggleStep = (num: number) => {
     setStepStates((prev) => {
@@ -184,6 +207,7 @@ export default function BriefIntake() {
 
   const summary = (num: number): string => {
     switch (num) {
+      case 0: return briefData.suburb && briefData.beds && briefData.budget ? 'Complete' : '';
       case 1: return briefData.nonNegotiables.length > 0 ? `${briefData.nonNegotiables.length} item${briefData.nonNegotiables.length !== 1 ? 's' : ''}` : '';
       case 2: return briefData.needs.length > 0 ? `${briefData.needs.length} item${briefData.needs.length !== 1 ? 's' : ''}` : '';
       case 3: return briefData.wants.length > 0 ? `${briefData.wants.length} item${briefData.wants.length !== 1 ? 's' : ''}` : '';
@@ -240,6 +264,154 @@ export default function BriefIntake() {
         {/* Step Cards */}
         <div>
           {/* Step 1: Non-negotiables */}
+          {/* Step 0: The Basics */}
+          <StepCard
+            stepNum={0}
+            title="The Basics"
+            subtitle="Tell me about your search"
+            isActive={stepStates[0]}
+            isCompleted={completedSteps.has(0)}
+            isLocked={false}
+            summary={summary(0)}
+            onToggle={() => toggleStep(0)}
+          >
+            <div className="field-group">
+              <label className="field-label">SUBURB / LOCATION</label>
+              <input
+                type="text"
+                className="field-input"
+                placeholder="e.g. Morisset Park, NSW"
+                value={briefData.suburb}
+                onChange={(e) => setBriefData({ ...briefData, suburb: e.target.value })}
+              />
+            </div>
+            <div className="field-group">
+              <label className="field-label">PROPERTY TYPE</label>
+              <select
+                className="field-input"
+                value={briefData.propertyType}
+                onChange={(e) => setBriefData({ ...briefData, propertyType: e.target.value })}
+              >
+                <option value="">Select type...</option>
+                <option value="house">House</option>
+                <option value="apartment">Apartment</option>
+                <option value="townhouse">Townhouse</option>
+                <option value="land">Land</option>
+                <option value="rural">Rural</option>
+              </select>
+            </div>
+            <div className="field-group">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="field-label">BEDS</label>
+                  <select
+                    className="field-input"
+                    value={briefData.beds}
+                    onChange={(e) => setBriefData({ ...briefData, beds: e.target.value })}
+                  >
+                    <option value="">Any</option>
+                    <option value="1">1+</option>
+                    <option value="2">2+</option>
+                    <option value="3">3+</option>
+                    <option value="4">4+</option>
+                    <option value="5">5+</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">BATHS</label>
+                  <select
+                    className="field-input"
+                    value={briefData.baths}
+                    onChange={(e) => setBriefData({ ...briefData, baths: e.target.value })}
+                  >
+                    <option value="">Any</option>
+                    <option value="1">1+</option>
+                    <option value="2">2+</option>
+                    <option value="3">3+</option>
+                    <option value="4">4+</option>
+                    <option value="5">5+</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">PARKING</label>
+                  <select
+                    className="field-input"
+                    value={briefData.parking}
+                    onChange={(e) => setBriefData({ ...briefData, parking: e.target.value })}
+                  >
+                    <option value="">Any</option>
+                    <option value="1">1+</option>
+                    <option value="2">2+</option>
+                    <option value="3">3+</option>
+                    <option value="4">4+</option>
+                    <option value="5">5+</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="field-group">
+              <label className="field-label">BUDGET</label>
+              <input
+                type="text"
+                className="field-input"
+                placeholder="$ e.g. 850,000"
+                value={briefData.budget}
+                onChange={(e) => setBriefData({ ...briefData, budget: e.target.value })}
+              />
+            </div>
+            <div className="field-group">
+              <label className="field-label">PURCHASE INTENT</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                {(['live', 'invest', 'both'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setBriefData({ ...briefData, intent: opt })}
+                    className="field-input"
+                    style={{
+                      background: briefData.intent === opt ? '#4A90D9' : '#F4F1EC',
+                      color: briefData.intent === opt ? 'white' : '#1E1E1E',
+                      border: `1.5px solid ${briefData.intent === opt ? '#4A90D9' : 'rgba(232,180,184,0.2)'}`,
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {opt === 'live' && '🏠 Live in'}
+                    {opt === 'invest' && '📈 Invest'}
+                    {opt === 'both' && 'Both'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="tier-labels">
+              <div className="tier-label">
+                <div className="tier-dot" style={{ background: '#E8614A' }} />
+                <span>All tiers</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (briefData.suburb && briefData.beds && briefData.budget) {
+                  markComplete(0);
+                  toggleStep(1);
+                }
+              }}
+              style={{
+                marginTop: '16px',
+                width: '100%',
+                padding: '10px',
+                background: briefData.suburb && briefData.beds && briefData.budget ? '#4A90D9' : '#E0E0E0',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Continue
+            </button>
+          </StepCard>
           <StepCard
             stepNum={1}
             title="Non-negotiables"

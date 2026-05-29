@@ -13,12 +13,20 @@ export default function Home() {
     baths: "",
     parking: "",
     budget: "",
+    intent: "live" as "live" | "invest" | "both",
   });
 
   const handleBriefSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    sessionStorage.setItem("briefBasics", JSON.stringify(briefData));
-    navigate("/brief");
+    const params = new URLSearchParams();
+    if (briefData.suburb) params.append("suburbs", briefData.suburb);
+    if (briefData.propertyType) params.append("type", briefData.propertyType);
+    if (briefData.beds) params.append("beds", briefData.beds);
+    if (briefData.baths) params.append("baths", briefData.baths);
+    if (briefData.parking) params.append("parking", briefData.parking);
+    if (briefData.budget) params.append("budget", briefData.budget);
+    params.append("intent", briefData.intent);
+    navigate(`/brief?${params.toString()}`);
   };
 
   /* Scroll reveal */
@@ -283,10 +291,38 @@ export default function Home() {
               </FieldLabel>
             </div>
 
+            {/* Purchase Intent Toggle */}
+            <div className="mt-4 pt-4 border-t" style={{ borderColor: "rgba(232,180,184,0.2)" }}>
+              <div style={{ fontFamily: "'Figtree',sans-serif", fontSize: 10, fontWeight: 500, letterSpacing: "1px", textTransform: "uppercase", color: "#7FA8D4", marginBottom: 8 }}>Purchase Intent</div>
+              <div className="flex gap-2">
+                {(["live", "invest", "both"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setBriefData({ ...briefData, intent: opt })}
+                    className="flex-1 px-3 py-2 rounded-8 text-center transition-all"
+                    style={{
+                      fontFamily: "'Figtree',sans-serif",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      background: briefData.intent === opt ? "#4A90D9" : "#F4F1EC",
+                      color: briefData.intent === opt ? "white" : "#1E1E1E",
+                      border: "1.5px solid",
+                      borderColor: briefData.intent === opt ? "#4A90D9" : "rgba(232,180,184,0.2)",
+                    }}
+                  >
+                    {opt === "live" && "🏠 Live in"}
+                    {opt === "invest" && "📈 Invest"}
+                    {opt === "both" && "Both"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Submit */}
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2.5 text-white transition-all mt-1"
+              className="w-full flex items-center justify-center gap-2.5 text-white transition-all mt-4"
               style={{
                 fontFamily: "'Outfit',sans-serif",
                 fontSize: 14,

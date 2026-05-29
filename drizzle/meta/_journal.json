@@ -8,6 +8,13 @@
       "when": 1780050000000,
       "tag": "0000_initial_pg_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780055318470,
+      "tag": "0001_giant_silver_sable",
+      "breakpoints": true
     }
   ]
 }
