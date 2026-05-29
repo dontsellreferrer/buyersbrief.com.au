@@ -70,24 +70,35 @@ export default function Home() {
             >
               {l.label}
             </a>
-          ))}
-          <a
-            href="/brief"
-            className="flex items-center gap-2 no-underline text-white transition-all"
-            style={{
-              fontFamily: "'Outfit',sans-serif",
-              fontSize: 13,
-              fontWeight: 500,
-              background: "#4A90D9",
-              padding: "10px 22px",
-              borderRadius: 24,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#3478C0"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "#4A90D9"; e.currentTarget.style.transform = "translateY(0)"; }}
-          >
-            <BBIcon docWidth={14} docHeight={18} pinSize={7} pinInnerSize={3} />
-            Start Your Brief
-          </a>
+          )          )}
+          <div className="flex items-center gap-4">
+            <a
+              href="/login"
+              className="no-underline transition-colors"
+              style={{ fontFamily: "'Figtree',sans-serif", fontSize: 13, fontWeight: 500, color: "#7FA8D4" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F1EC")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#7FA8D4")}
+            >
+              Sign in
+            </a>
+            <a
+              href="/brief"
+              className="flex items-center gap-2 no-underline text-white transition-all"
+              style={{
+                fontFamily: "'Outfit',sans-serif",
+                fontSize: 13,
+                fontWeight: 500,
+                background: "#4A90D9",
+                padding: "10px 22px",
+                borderRadius: 24,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#3478C0"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#4A90D9"; e.currentTarget.style.transform = "translateY(0)"; }}
+            >
+              <BBIcon docWidth={14} docHeight={18} pinSize={7} pinInnerSize={3} />
+              Start Your Brief
+            </a>
+          </div>
         </div>
 
         {/* Mobile hamburger */}
