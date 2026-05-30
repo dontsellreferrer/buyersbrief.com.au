@@ -38,14 +38,8 @@ export default function Home() {
       const handleHamburgerClick = (e: Event) => {
         e.preventDefault();
         e.stopPropagation();
-        if (navLinks) {
-          const isHidden = window.getComputedStyle(navLinks).display === 'none';
-          navLinks.style.display = isHidden ? 'flex' : 'none';
-        }
-        if (navCta) {
-          const isHidden = window.getComputedStyle(navCta).display === 'none';
-          navCta.style.display = isHidden ? 'flex' : 'none';
-        }
+        if (navLinks) navLinks.classList.toggle('mobile-open');
+        if (navCta) navCta.classList.toggle('mobile-open');
       };
       hamburger.addEventListener('click', handleHamburgerClick);
     }
