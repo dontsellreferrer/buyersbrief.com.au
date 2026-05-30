@@ -1755,6 +1755,18 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.1 });
 reveals.forEach(el => observer.observe(el));
 
+// Hamburger menu toggle
+const hamburger = document.querySelector('.nav-hamburger');
+const navLinks = document.querySelector('.nav-links');
+const navCta = document.querySelector('.nav-cta');
+
+if (hamburger) {
+  hamburger.addEventListener('click', () => {
+    if (navLinks) navLinks.style.display = navLinks.style.display === 'none' ? 'flex' : 'none';
+    if (navCta) navCta.style.display = navCta.style.display === 'none' ? 'flex' : 'none';
+  });
+}
+
 // Nav scroll effect
 const nav = document.querySelector('nav');
 window.addEventListener('scroll', () => {
