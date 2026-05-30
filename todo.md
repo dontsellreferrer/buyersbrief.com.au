@@ -303,3 +303,20 @@
 - [x] Remove Forge API env references (forgeApiUrl, forgeApiKey from env.ts)
 - [x] Remove /manus-storage asset references from components
 - [x] Audit codebase for any remaining 'manus', 'forge', 'oauth' references
+
+
+## Multi-Step Signup Flow with Stripe Integration
+- [ ] Set up Stripe integration via webdev_add_feature
+- [ ] Add Stripe API keys to Railway env vars (STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET)
+- [ ] Create multi-step Signup.tsx component with 4 steps
+  - [ ] Step 1: Name, email, password form with Liam greeting
+  - [ ] Step 2: Tier selection (Pay vs Afford path cards)
+  - [ ] Step 3: Stripe payment processing (if Pay selected)
+  - [ ] Step 4: Success confirmation
+- [ ] Update auth.signup tRPC procedure to accept tier parameter
+- [ ] Implement Stripe checkout session creation
+- [ ] Add Stripe webhook handler for subscription events
+- [ ] Update App.tsx routes to use new Signup component
+- [ ] Write vitest tests for signup flow
+- [ ] Test end-to-end signup (free and paid paths)
+- [ ] Deploy to Railway and verify Stripe integration

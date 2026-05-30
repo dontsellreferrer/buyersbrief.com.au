@@ -1,176 +1,103 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { trpc } from "@/lib/trpc";
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useEffect } from 'react';
+import { useLocation } from 'wouter';
+import { useAuth } from '@/_core/hooks/useAuth';
+import signupHTML from './signup.html?raw';
 
 export default function Signup() {
   const [, navigate] = useLocation();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [error, setError] = useState("");
+  const { user } = useAuth();
 
-  const signupMutation = trpc.auth.signup.useMutation({
-    onSuccess: () => {
-      navigate("/");
-    },
-    onError: (err) => {
-      setError(err.message || "Something went wrong. Please try again.");
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
     }
+  }, [user, navigate]);
 
-    signupMutation.mutate({
-      email,
-      password,
-      firstName,
-      lastName: lastName || undefined,
-      mobile: mobile || undefined,
-    });
-  };
+  useEffect(() => {
+    // Inject the global functions that the HTML expects
+    (window as any).goStep = (n: number) => {
+      // Hide all steps
+      document.querySelectorAll('.step-page').forEach(p => p.classList.remove('active'));
+
+      if (n === 3) {
+        // Show correct step 3
+        if ((window as any).selectedPathType === 'pay') {
+          const step3pay = document.getElementById('step3pay');
+          if (step3pay) step3pay.classList.add('active');
+        } else {
+          const step3afford = document.getElementById('step3afford');
+          if (step3afford) step3afford.classList.add('active');
+          const brokerNextItem = document.getElementById('brokerNextItem');
+          if (brokerNextItem) brokerNextItem.style.display = 'flex';
+        }
+      } else {
+        const step = document.getElementById('step' + n);
+        if (step) step.classList.add('active');
+      }
+
+      (window as any).currentStep = n;
+      (window as any).updateNav(n);
+      window.scrollTo(0, 0);
+    };
+
+    (window as any).updateNav = (n: number) => {
+      const steps = [1, 2, 3, 4];
+      steps.forEach(s => {
+        const el = document.getElementById('ns' + s);
+        const num = document.getElementById('nsn' + s);
+        if (el && num) {
+          el.classList.remove('active', 'done');
+          if (s < n) {
+            el.classList.add('done');
+            num.textContent = '✓';
+          } else if (s === n) {
+            el.classList.add('active');
+            num.textContent = String(s);
+          } else {
+            num.textContent = String(s);
+          }
+        }
+      });
+    };
+
+    (window as any).selectPath = (type: string) => {
+      (window as any).selectedPathType = type;
+      document.querySelectorAll('.path-card').forEach(c => c.classList.remove('selected-path'));
+      const card = document.querySelector('.path-card.' + type);
+      if (card) card.classList.add('selected-path');
+
+      const btn = document.getElementById('pathBtn') as HTMLButtonElement;
+      const note = document.getElementById('pathNote');
+      if (btn && note) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+
+        if (type === 'pay') {
+          btn.innerHTML = 'Continue to payment <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-left:8px;"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          btn.style.background = 'var(--sky)';
+          btn.style.color = 'white';
+          note.textContent = '$99/month · cancel anytime from your dashboard';
+        } else {
+          btn.innerHTML = 'Continue to book my call <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-left:8px;"><path d="M3 8h10M9 4l4 4-4 4" stroke="var(--charcoal)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          btn.style.background = 'var(--rose)';
+          btn.style.color = 'var(--charcoal)';
+          note.textContent = 'Brief Active free · one 30-min broker call · no obligation';
+        }
+      }
+    };
+
+    (window as any).selectSlot = (el: HTMLElement) => {
+      document.querySelectorAll('.time-slot').forEach(s => s.classList.remove('selected-slot'));
+      el.classList.add('selected-slot');
+    };
+
+    // Initialize
+    (window as any).currentStep = 1;
+    (window as any).selectedPathType = null;
+  }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--color-bb-offwhite)]">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto w-full">
-        <a href="/" className="flex items-center">
-          <img src="/bb-logo.svg" alt="Buyers Brief" className="h-10" />
-        </a>
-        <Link href="/login">
-          <Button variant="ghost" className="text-sm font-medium text-[var(--color-bb-charcoal)]">
-            Sign in
-          </Button>
-        </Link>
-      </nav>
-
-      {/* Form */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
-            <div className="text-center space-y-2">
-              <img src="/bb-icon.png" alt="" className="h-12 w-12 mx-auto" />
-              <h1 className="text-2xl font-bold font-[var(--font-outfit)] text-[var(--color-bb-charcoal)]">
-                Create your account
-              </h1>
-              <p className="text-sm text-[var(--color-bb-mid)]">
-                Start finding your perfect property match
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-                  {error}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium text-[var(--color-bb-charcoal)]">
-                    First name *
-                  </Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="Liam"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    className="h-11 rounded-lg border-gray-200 focus:border-[var(--color-bb-sky)] focus:ring-[var(--color-bb-sky)]"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium text-[var(--color-bb-charcoal)]">
-                    Last name
-                  </Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Optional"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="h-11 rounded-lg border-gray-200 focus:border-[var(--color-bb-sky)] focus:ring-[var(--color-bb-sky)]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-[var(--color-bb-charcoal)]">
-                  Email *
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-11 rounded-lg border-gray-200 focus:border-[var(--color-bb-sky)] focus:ring-[var(--color-bb-sky)]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mobile" className="text-sm font-medium text-[var(--color-bb-charcoal)]">
-                  Mobile
-                </Label>
-                <Input
-                  id="mobile"
-                  type="tel"
-                  placeholder="04XX XXX XXX"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
-                  className="h-11 rounded-lg border-gray-200 focus:border-[var(--color-bb-sky)] focus:ring-[var(--color-bb-sky)]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-[var(--color-bb-charcoal)]">
-                  Password *
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Min. 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="h-11 rounded-lg border-gray-200 focus:border-[var(--color-bb-sky)] focus:ring-[var(--color-bb-sky)]"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={signupMutation.isPending}
-                className="w-full h-11 rounded-lg bg-[var(--color-bb-sky)] hover:bg-[var(--color-bb-sky-dark)] text-white font-semibold text-sm transition-all active:scale-[0.97]"
-              >
-                {signupMutation.isPending ? "Creating account..." : "Create account"}
-              </Button>
-            </form>
-
-            <div className="text-center">
-              <p className="text-sm text-[var(--color-bb-mid)]">
-                Already have an account?{" "}
-                <Link href="/login" className="text-[var(--color-bb-sky)] hover:text-[var(--color-bb-sky-dark)] font-medium">
-                  Sign in
-                </Link>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div dangerouslySetInnerHTML={{ __html: signupHTML }} />
   );
 }
