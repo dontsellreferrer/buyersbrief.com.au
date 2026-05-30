@@ -27,8 +27,34 @@ export default function Home() {
           : 'none';
       };
       window.addEventListener('scroll', handleScroll);
-      return () => window.removeEventListener('scroll', handleScroll);
     }
+
+    // Hamburger menu toggle
+    const hamburger = document.querySelector('.nav-hamburger') as HTMLButtonElement;
+    const navLinks = document.querySelector('.nav-links') as HTMLElement;
+    const navCta = document.querySelector('.nav-cta') as HTMLElement;
+
+    if (hamburger) {
+      const handleHamburgerClick = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (navLinks) {
+          const isHidden = window.getComputedStyle(navLinks).display === 'none';
+          navLinks.style.display = isHidden ? 'flex' : 'none';
+        }
+        if (navCta) {
+          const isHidden = window.getComputedStyle(navCta).display === 'none';
+          navCta.style.display = isHidden ? 'flex' : 'none';
+        }
+      };
+      hamburger.addEventListener('click', handleHamburgerClick);
+    }
+
+    return () => {
+      if (nav) {
+        window.removeEventListener('scroll', () => {});
+      }
+    };
   }, []);
 
   useEffect(() => {
