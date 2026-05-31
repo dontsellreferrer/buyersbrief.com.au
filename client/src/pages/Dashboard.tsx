@@ -7,15 +7,7 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
 
-  if (!user) {
-    return null;
-  }
 
   useEffect(() => {
     // Inject all global functions that the HTML expects

@@ -29,6 +29,7 @@ function Router() {
       <Route path={"/signup"} component={Signup} />
       <Route path={"/partners"} component={Partners} />
       <Route path={"/dashboard"} component={Dashboard} />
+      <Route path={"/cma/:property"} component={CMA} />
       <Route path={"/cma"} component={CMA} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
