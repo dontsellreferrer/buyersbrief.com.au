@@ -1112,6 +1112,44 @@ body {
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:rgba(127,168,212,0.2); border-radius:2px; }
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 768px) {
+  .shell { flex-direction: column; height: auto; }
+  .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: none; border-bottom: 1px solid var(--rule); padding: 12px; gap: 12px; }
+  .sidebar-logo { padding: 0; border: none; }
+  .sidebar-brief { padding: 0; border: none; }
+  .sidebar-nav { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sidebar-nav a { padding: 8px 12px; font-size: 12px; white-space: nowrap; }
+  .main { flex: 1; overflow-y: auto; }
+  .header { padding: 16px; }
+  .content { padding: 16px; }
+  .brief-card { max-width: 100%; }
+  .grid { grid-template-columns: 1fr !important; }
+  .match-card { margin-bottom: 12px; }
+  .hotlist-card { flex-direction: column; }
+  .hotlist-right { width: 100%; margin-top: 12px; }
+  .modal { width: 90vw; max-height: 80vh; }
+  .modal-content { padding: 16px; }
+  button { padding: 10px 14px; font-size: 12px; }
+  input, select, textarea { padding: 8px 12px; font-size: 14px; }
+}
+
+@media (max-width: 480px) {
+  .sidebar { padding: 8px; }
+  .sidebar-logo { display: none; }
+  .header { padding: 12px; }
+  .content { padding: 12px; }
+  .brief-card { padding: 16px; }
+  .match-card { padding: 12px; }
+  .hotlist-card { padding: 12px; }
+  .modal { width: 95vw; }
+  .modal-header h2 { font-size: 16px; }
+  button { padding: 8px 12px; font-size: 11px; }
+  input, select, textarea { font-size: 16px; padding: 8px; }
+  .grid { gap: 8px; }
+  .match-card .match-price { font-size: 18px; }
+}
 </style>
 </head>
 <body>

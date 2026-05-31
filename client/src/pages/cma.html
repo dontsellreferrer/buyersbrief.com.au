@@ -338,6 +338,45 @@ body::before {
 .page > *:nth-child(3) { animation-delay:0.15s; }
 .page > *:nth-child(4) { animation-delay:0.2s; }
 .page > *:nth-child(5) { animation-delay:0.25s; }
+
+/* MOBILE RESPONSIVE */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+  .shell { flex-direction: column; }
+  .header { padding: 16px; }
+  .header-nav { flex-direction: column; gap: 12px; }
+  .header-title { font-size: 20px; }
+  .header-sub { font-size: 12px; }
+  .page { padding: 16px; }
+  .section { padding: 16px; margin-bottom: 16px; }
+  .section-title { font-size: 16px; margin-bottom: 12px; }
+  .grid { grid-template-columns: 1fr !important; gap: 12px; }
+  .card { padding: 12px; }
+  .card-title { font-size: 14px; }
+  .card-value { font-size: 18px; }
+  .table { font-size: 12px; }
+  .table td, .table th { padding: 8px; }
+  .badge { padding: 4px 8px; font-size: 11px; }
+  .modal { width: 90vw; }
+}
+
+@media (max-width: 480px) {
+  body { font-size: 12px; }
+  .header { padding: 12px; }
+  .header-title { font-size: 18px; }
+  .header-sub { font-size: 11px; }
+  .page { padding: 12px; }
+  .section { padding: 12px; margin-bottom: 12px; }
+  .section-title { font-size: 14px; }
+  .card { padding: 10px; }
+  .card-title { font-size: 12px; }
+  .card-value { font-size: 16px; }
+  .table { font-size: 11px; }
+  .table td, .table th { padding: 6px; }
+  .badge { padding: 3px 6px; font-size: 10px; }
+  button { padding: 8px 12px; font-size: 11px; }
+  .modal { width: 95vw; }
+}
 </style>
 </head>
 <body>
