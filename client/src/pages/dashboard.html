@@ -561,94 +561,217 @@ body {
 .wanna-step-text strong { color:var(--offwhite); font-weight:500; }
 
 /* ── MODAL ── */
+
+/* ── PROCEED MODAL — TIER 3 CONCIERGE ── */
 .modal-overlay {
   position:fixed; inset:0; z-index:200;
-  background:rgba(0,0,0,0.7); backdrop-filter:blur(4px);
+  background:rgba(0,0,0,0.75); backdrop-filter:blur(6px);
   display:none; align-items:center; justify-content:center;
+  padding:20px;
 }
 .modal-overlay.open { display:flex; }
+
 .modal {
   background:var(--c2);
-  border:1px solid rgba(232,180,184,0.25);
-  border-radius:16px; padding:36px;
-  width:100%; max-width:520px;
+  border:1px solid rgba(232,180,184,0.2);
+  border-radius:16px;
+  width:100%; max-width:500px;
+  max-height:90vh;
+  overflow-y:auto;
   position:relative;
+  display:flex; flex-direction:column;
   animation:fadeUp 0.25s ease;
 }
 .modal::before {
-  content:'';
-  position:absolute; top:0; left:0; right:0; height:3px;
+  content:''; position:sticky; top:0; left:0; right:0;
+  height:3px; display:block;
   background:linear-gradient(90deg, var(--rose), var(--sky));
-  border-radius:16px 16px 0 0;
+  border-radius:3px 3px 0 0;
+  flex-shrink:0;
+}
+
+/* Step bar */
+.modal-step-bar {
+  display:flex; align-items:center; gap:0;
+  padding:16px 24px 0;
+}
+.modal-step-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:rgba(127,168,212,0.2);
+  transition:background 0.3s; flex-shrink:0;
+}
+.modal-step-dot.active { background:var(--rose); }
+.modal-step-dot.done { background:var(--green); }
+.modal-step-line {
+  flex:1; height:1px; background:rgba(127,168,212,0.15); max-width:40px;
+}
+
+/* Step content */
+.modal-step { display:flex; flex-direction:column; flex:1; }
+.modal-step-header { padding:16px 24px 0; }
+.modal-eyebrow {
+  font-family:'Figtree',sans-serif; font-size:10px; font-weight:500;
+  color:var(--rose); letter-spacing:1.5px; text-transform:uppercase;
+  margin-bottom:8px;
 }
 .modal-title {
   font-family:'Outfit',sans-serif;
-  font-size:20px; font-weight:700; color:var(--offwhite);
+  font-size:clamp(22px,4vw,28px); font-weight:700;
+  color:var(--offwhite); line-height:1.1; margin-bottom:8px;
+}
+.modal-title-sky { color:var(--sky); font-weight:300; }
+.modal-sub {
+  font-family:'Figtree',sans-serif; font-size:13px;
+  color:var(--steel); line-height:1.5; margin-bottom:0;
+}
+.modal-body { padding:20px 24px; flex:1; }
+.modal-footer {
+  padding:16px 24px 20px; border-top:1px solid var(--rule);
+  display:flex; flex-direction:column; gap:8px;
+}
+
+/* Property card */
+.modal-property {
+  padding:14px 16px;
+  background:rgba(74,144,217,0.05);
+  border:1px solid rgba(74,144,217,0.15);
+  border-radius:10px; margin-bottom:18px;
+}
+.modal-prop-eyebrow {
+  font-family:'Figtree',sans-serif; font-size:9px; font-weight:500;
+  color:var(--steel); letter-spacing:1.2px; text-transform:uppercase;
   margin-bottom:4px;
 }
-.modal-sub {
-  font-family:'Figtree',sans-serif;
-  font-size:13px; color:var(--steel);
-  margin-bottom:24px; line-height:1.5;
+.modal-prop-addr {
+  font-family:'Outfit',sans-serif; font-size:14px;
+  font-weight:700; color:var(--offwhite); margin-bottom:2px;
 }
-.modal-property {
-  padding:12px 14px;
-  background:rgba(74,144,217,0.06);
-  border:1px solid rgba(74,144,217,0.15);
-  border-radius:8px; margin-bottom:20px;
+.modal-prop-meta {
+  font-family:'Figtree',sans-serif; font-size:11px; color:var(--steel);
 }
-.modal-prop-addr { font-family:'Outfit',sans-serif; font-size:13px; font-weight:600; color:var(--offwhite); }
-.modal-prop-meta { font-family:'Figtree',sans-serif; font-size:11px; color:var(--steel); margin-top:2px; }
 
+/* Fields */
 .modal-field { margin-bottom:16px; }
 .modal-label {
-  font-family:'Figtree',sans-serif;
-  font-size:10px; font-weight:500;
-  color:var(--steel); letter-spacing:1.5px; text-transform:uppercase;
+  font-family:'Figtree',sans-serif; font-size:10px; font-weight:500;
+  color:var(--steel); letter-spacing:1.2px; text-transform:uppercase;
   display:block; margin-bottom:6px;
 }
 .modal-input {
-  width:100%;
-  font-family:'Figtree',sans-serif;
-  font-size:13px; color:var(--offwhite);
+  width:100%; font-family:'Figtree',sans-serif;
+  font-size:14px; color:var(--offwhite);
   background:rgba(255,255,255,0.04);
   border:1.5px solid rgba(127,168,212,0.15);
-  border-radius:8px; padding:10px 13px; outline:none;
+  border-radius:8px; padding:11px 13px; outline:none;
   transition:border-color 0.2s;
 }
 .modal-input:focus { border-color:var(--sky); }
-.modal-input::placeholder { color:rgba(127,168,212,0.35); font-style:italic; }
+.modal-input::placeholder { color:rgba(127,168,212,0.3); font-style:italic; }
 .modal-hint {
-  font-family:'Figtree',sans-serif;
-  font-size:10px; color:rgba(127,168,212,0.4);
-  margin-top:5px; line-height:1.4;
+  font-family:'Figtree',sans-serif; font-size:10px;
+  color:rgba(127,168,212,0.4); margin-top:5px; line-height:1.5;
 }
 
-.modal-actions { display:flex; gap:10px; margin-top:24px; }
-.modal-submit {
-  flex:1;
-  font-family:'Outfit',sans-serif;
-  font-size:13px; font-weight:600;
+/* Guarantee badge */
+.modal-guarantee {
+  display:flex; align-items:flex-start; gap:10px;
+  padding:12px 14px;
+  background:rgba(232,180,184,0.05);
+  border:1px solid rgba(232,180,184,0.15);
+  border-radius:8px; margin-top:4px;
+}
+.modal-guarantee-icon { flex-shrink:0; margin-top:1px; }
+.modal-guarantee-text {
+  font-family:'Figtree',sans-serif; font-size:12px;
+  color:var(--steel); line-height:1.5;
+}
+
+/* Buttons */
+.modal-next, .modal-submit {
+  width:100%; font-family:'Outfit',sans-serif;
+  font-size:14px; font-weight:600;
   color:var(--charcoal); background:var(--rose);
-  border:none; border-radius:8px; padding:12px; cursor:pointer;
-  transition:background 0.2s;
+  border:none; border-radius:10px; padding:14px;
+  cursor:pointer; transition:background 0.2s;
+  display:flex; align-items:center; justify-content:center; gap:8px;
 }
-.modal-submit:hover { background:var(--rose-dark); }
+.modal-next:hover, .modal-submit:hover { background:var(--rose-dark); }
 .modal-cancel {
-  font-family:'Figtree',sans-serif;
-  font-size:13px; color:var(--steel);
-  background:none; border:1px solid var(--rule);
-  border-radius:8px; padding:12px 20px; cursor:pointer;
-  transition:all 0.2s;
+  font-family:'Figtree',sans-serif; font-size:12px;
+  color:rgba(127,168,212,0.5); background:none;
+  border:none; cursor:pointer; padding:4px;
+  transition:color 0.2s; text-align:center;
 }
-.modal-cancel:hover { border-color:rgba(127,168,212,0.3); color:var(--offwhite); }
-.modal-close {
-  position:absolute; top:14px; right:14px;
-  background:none; border:none; cursor:pointer;
-  color:rgba(127,168,212,0.4); font-size:18px; line-height:1;
+.modal-cancel:hover { color:var(--steel); }
+.modal-back {
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:'Figtree',sans-serif; font-size:12px;
+  color:var(--steel); background:none; border:none;
+  cursor:pointer; padding:0; margin-bottom:12px;
   transition:color 0.2s;
 }
-.modal-close:hover { color:var(--offwhite); }
+.modal-back:hover { color:var(--offwhite); }
+.modal-submit-hint {
+  font-family:'Figtree',sans-serif; font-size:11px;
+  color:rgba(127,168,212,0.4); text-align:center; line-height:1.4;
+}
+.modal-close {
+  width:30px; height:30px;
+  background:rgba(255,255,255,0.06); border:1px solid var(--rule);
+  border-radius:50%; cursor:pointer; color:var(--steel);
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s; margin-bottom:14px;
+}
+.modal-close:hover { background:rgba(255,255,255,0.1); color:var(--offwhite); }
+
+/* Confirmation screen */
+.modal-confirm-screen {
+  display:flex; flex-direction:column; align-items:center;
+  text-align:center; padding:32px 24px 28px;
+  flex:1;
+}
+.modal-confirm-icon {
+  width:64px; height:64px; border-radius:50%;
+  background:rgba(232,180,184,0.1);
+  border:1px solid rgba(232,180,184,0.2);
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:20px;
+}
+.modal-confirm-title {
+  font-family:'Outfit',sans-serif; font-size:32px;
+  font-weight:700; color:var(--offwhite); margin-bottom:10px;
+}
+.modal-confirm-sub {
+  font-family:'Figtree',sans-serif; font-size:13px;
+  color:var(--steel); line-height:1.65; margin-bottom:20px;
+  max-width:320px;
+}
+.modal-confirm-property {
+  padding:14px 20px;
+  background:rgba(74,144,217,0.05);
+  border:1px solid rgba(74,144,217,0.12);
+  border-radius:10px; margin-bottom:16px; width:100%;
+}
+.modal-confirm-addr {
+  font-family:'Outfit',sans-serif; font-size:13px;
+  font-weight:700; color:var(--offwhite); margin-bottom:3px;
+}
+.modal-confirm-meta {
+  font-family:'Figtree',sans-serif; font-size:11px; color:var(--steel);
+}
+.modal-confirm-guarantee {
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:'Figtree',sans-serif; font-size:11px; color:var(--rose);
+  margin-bottom:24px;
+}
+.modal-done {
+  font-family:'Outfit',sans-serif; font-size:13px; font-weight:600;
+  color:var(--offwhite); background:rgba(255,255,255,0.06);
+  border:1px solid var(--rule); border-radius:10px;
+  padding:12px 24px; cursor:pointer; transition:all 0.2s;
+}
+.modal-done:hover { background:rgba(255,255,255,0.1); }
+
 
 @keyframes fadeUp {
   from { opacity:0; transform:translateY(12px); }
@@ -1108,48 +1231,250 @@ body {
 .toggle-switch input:checked + .toggle-slider { background:rgba(74,144,217,0.3); border-color:var(--sky); }
 .toggle-switch input:checked + .toggle-slider::before { transform:translateX(16px); background:var(--sky); }
 
+
+/* ═══════════════════════════════════════════════════
+   MOBILE — max-width 768px
+   Dashboard: sidebar → bottom nav bar
+   ═══════════════════════════════════════════════════ */
+
+
+
+/* ═══════════════════════════════════════════════════
+   MOBILE — max-width 768px
+   Sidebar: slide-in drawer with overlay
+   ═══════════════════════════════════════════════════ */
+
+/* Mobile header (hidden on desktop) */
+.mobile-header {
+  display: none;
+}
+
+/* Sidebar overlay (hidden on desktop) */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 98;
+}
+.sidebar-overlay.show { display: block; }
+
+@media (max-width: 768px) {
+
+  /* ── SHELL ── */
+  .shell { flex-direction: column; }
+
+  /* ── SIDEBAR — slide-in drawer ── */
+  .sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    z-index: 99;
+    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 100vh;
+    overflow-y: auto;
+    box-shadow: none;
+  }
+  .sidebar.open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+  }
+
+  /* ── MAIN — full width ── */
+  .main { width: 100%; overflow-y: auto; height: 100vh; }
+  .content { padding: 0 16px 80px; }
+
+  /* ── MOBILE HEADER ── */
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0 14px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+    position: sticky;
+    top: 0;
+    background: var(--charcoal);
+    z-index: 10;
+  }
+
+  /* Hamburger */
+  .hamburger {
+    width: 36px; height: 36px;
+    background: var(--c2);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex-shrink: 0;
+    transition: border-color 0.2s;
+  }
+  .hamburger:hover { border-color: rgba(74,144,217,0.3); }
+  .hamburger span {
+    display: block;
+    width: 16px; height: 1.5px;
+    background: var(--steel);
+    border-radius: 2px;
+    transition: background 0.2s;
+  }
+  .hamburger:hover span { background: var(--offwhite); }
+
+  /* Mobile brief summary in header */
+  .mobile-brief-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-brief-loc {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--offwhite);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mobile-brief-running {
+    font-family: 'Figtree', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--green);
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  /* ── MATCH CARDS ── */
+  .match-card { padding: 14px; }
+  .match-addr { font-size: 13px; }
+  .match-meta { font-size: 11px; flex-wrap: wrap; }
+  .match-score { gap: 8px; }
+  .score-ring { width: 38px; height: 38px; }
+  .score-ring svg { width: 38px; height: 38px; }
+  .score-pct { font-size: 11px; }
+  .score-missing { font-size: 10px; }
+  .status-pill { font-size: 9px; padding: 2px 7px; }
+
+  /* ── HOTLIST CARDS ── */
+  .hotlist-card { grid-template-columns: 1fr; gap: 0; }
+  .hotlist-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
+    margin-top: 12px;
+  }
+  .hotlist-price { font-size: 18px; }
+  .hotlist-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .btn-proceed { font-size: 11px; padding: 7px 12px; }
+  .btn-cma { font-size: 11px; padding: 7px 12px; }
+  .btn-remove { font-size: 11px; padding: 7px 10px; }
+
+  /* ── ACCOUNT ── */
+  .account-grid { grid-template-columns: 1fr; }
+  .account-card { padding: 18px 16px; }
+  .edit-field-row { grid-template-columns: 1fr; }
+  .notif-row { flex-wrap: wrap; gap: 10px; }
+
+  /* ── EDIT BRIEF MODAL — bottom sheet ── */
+  .edit-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .edit-modal {
+    border-radius: 14px 14px 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 100%;
+  }
+  .edit-modal-header { padding: 16px 20px; }
+  .edit-modal-body { padding: 16px 20px; }
+  .edit-modal-footer { padding: 12px 20px; }
+  .edit-field-row { grid-template-columns: 1fr; }
+  .edit-field-input,
+  .edit-field-select,
+  .edit-field-textarea { font-size: 16px; } /* prevent iOS zoom */
+
+  /* ── PROCEED MODAL — bottom sheet ── */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    border-radius: 14px 14px 0 0;
+    max-height: 85vh;
+    overflow-y: auto;
+    width: 100%;
+  }
+
+  /* ── CMA LOADING OVERLAY ── */
+  .cma-loading-card { padding: 28px 20px; margin: 0 16px; }
+  .cma-loading-title { font-size: 16px; }
+  .cma-steps { gap: 6px; margin-top: 16px; }
+  .cma-step { font-size: 10px; }
+
+  /* ── PROCEED MODAL — full screen on mobile ── */
+  .modal-overlay {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 0;
+  }
+  .modal-overlay.open {
+    display: flex;
+  }
+  .modal {
+    width: 100%;
+    min-height: 100vh;
+    max-width: 100%;
+    border-radius: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    animation: none;
+  }
+  .modal::before {
+    border-radius: 0;
+    height: 4px;
+  }
+  .modal-close {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    z-index: 10;
+    background: rgba(37,37,37,0.9);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+}
+
+@media (max-width: 420px) {
+  .content { padding: 0 12px 80px; }
+  .match-card { padding: 12px; }
+  .hotlist-card { padding: 12px; }
+}
+
 /* scrollbar */
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:rgba(127,168,212,0.2); border-radius:2px; }
-
-/* MOBILE RESPONSIVE */
-@media (max-width: 768px) {
-  .shell { flex-direction: column; height: auto; }
-  .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: none; border-bottom: 1px solid var(--rule); padding: 12px; gap: 12px; }
-  .sidebar-logo { padding: 0; border: none; }
-  .sidebar-brief { padding: 0; border: none; }
-  .sidebar-nav { display: flex; gap: 8px; flex-wrap: wrap; }
-  .sidebar-nav a { padding: 8px 12px; font-size: 12px; white-space: nowrap; }
-  .main { flex: 1; overflow-y: auto; }
-  .header { padding: 16px; }
-  .content { padding: 16px; }
-  .brief-card { max-width: 100%; }
-  .grid { grid-template-columns: 1fr !important; }
-  .match-card { margin-bottom: 12px; }
-  .hotlist-card { flex-direction: column; }
-  .hotlist-right { width: 100%; margin-top: 12px; }
-  .modal { width: 90vw; max-height: 80vh; }
-  .modal-content { padding: 16px; }
-  button { padding: 10px 14px; font-size: 12px; }
-  input, select, textarea { padding: 8px 12px; font-size: 14px; }
-}
-
-@media (max-width: 480px) {
-  .sidebar { padding: 8px; }
-  .sidebar-logo { display: none; }
-  .header { padding: 12px; }
-  .content { padding: 12px; }
-  .brief-card { padding: 16px; }
-  .match-card { padding: 12px; }
-  .hotlist-card { padding: 12px; }
-  .modal { width: 95vw; }
-  .modal-header h2 { font-size: 16px; }
-  button { padding: 8px 12px; font-size: 11px; }
-  input, select, textarea { font-size: 16px; padding: 8px; }
-  .grid { gap: 8px; }
-  .match-card .match-price { font-size: 18px; }
-}
 </style>
 </head>
 <body>
@@ -1242,6 +1567,20 @@ body {
 
     <!-- Content -->
     <div class="content">
+
+      <!-- Mobile header — hamburger + brief summary -->
+      <div class="mobile-header" id="mobileHeader">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="mobile-brief-summary">
+          <span class="mobile-brief-loc">Newcastle · Merewether</span>
+          <span class="mobile-brief-running">● RUNNING</span>
+        </div>
+      </div>
+      <!-- Sidebar overlay (mobile) -->
+      <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 
       <!-- ── NEW MATCHES ── -->
       <div class="section-gap">
@@ -1806,31 +2145,131 @@ body {
 
 <!-- ── MODAL — PROCEED ── -->
 <div class="modal-overlay" id="modalOverlay">
-  <div class="modal">
-    <button class="modal-close" onclick="closeModal()">✕</button>
-    <div class="modal-title">Let's get you that property.</div>
-    <div class="modal-sub">Tell us which property and the most you'd pay. Liam's team will be in touch within one business day.</div>
+  <div class="modal" id="proceedModal">
 
-    <div class="modal-property">
-      <div class="modal-prop-addr">22 Scenic Dr, Merewether NSW 2291</div>
-      <div class="modal-prop-meta">4 bed · 2 bath · Double garage · $1,050,000 asking</div>
+    <!-- Step indicator -->
+    <div class="modal-step-bar">
+      <div class="modal-step-dot active" id="msdot1"></div>
+      <div class="modal-step-line"></div>
+      <div class="modal-step-dot" id="msdot2"></div>
+      <div class="modal-step-line"></div>
+      <div class="modal-step-dot" id="msdot3"></div>
     </div>
 
-    <div class="modal-field">
-      <label class="modal-label">The most you would pay for this property</label>
-      <input class="modal-input" type="text" placeholder="e.g. $1,020,000 — be honest, this is your number">
-      <div class="modal-hint">This is your maximum. We must get it for at least $10,000 under this figure — or the service is free. We never share this number with the vendor.</div>
+    <!-- Step 1: Property + Your number -->
+    <div class="modal-step" id="mstep1">
+      <div class="modal-step-header">
+        <button class="modal-close" onclick="closeModal()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="modal-eyebrow">Tier 3 — Buyers Concierge</div>
+        <h2 class="modal-title">Let's get you<br><span class="modal-title-sky">that property.</span></h2>
+        <p class="modal-sub">Liam's team negotiates on your behalf. We must beat your price by $10,000 — or the service is free.</p>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-property">
+          <div class="modal-prop-eyebrow">The property</div>
+          <div class="modal-prop-addr" id="modal-addr">2 Havilah Street, Morisset Park NSW 2264</div>
+          <div class="modal-prop-meta" id="modal-meta">4 bed · 2 bath · 2 car · 751.9m²</div>
+        </div>
+
+        <div class="modal-field">
+          <label class="modal-label">Your maximum — be honest, this is your real number</label>
+          <input class="modal-input" id="modal-max-price" type="text" placeholder="e.g. $1,180,000" inputmode="numeric">
+          <div class="modal-hint">We never share this with the vendor. If we can't beat it by $10K, you pay nothing.</div>
+        </div>
+
+        <div class="modal-guarantee">
+          <div class="modal-guarantee-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L2 5v5c0 4 3.1 7.7 7 8.5 3.9-.8 7-4.5 7-8.5V5L9 1.5z" stroke="var(--rose)" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 9l2 2 4-4" stroke="var(--rose)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="modal-guarantee-text">$10,000 guarantee — if we don't beat your price by $10K, the service is free.</div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="modal-next" onclick="proceedStep2()">
+          Continue — confirm the details
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      </div>
     </div>
 
-    <div class="modal-field">
-      <label class="modal-label">Anything else Liam should know?</label>
-      <input class="modal-input" type="text" placeholder="Settlement timing, conditions, finance status...">
+    <!-- Step 2: Notes + Finance -->
+    <div class="modal-step" id="mstep2" style="display:none;">
+      <div class="modal-step-header">
+        <button class="modal-back" onclick="proceedStep1()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M11 7H3M7 3L3 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Back
+        </button>
+        <div class="modal-eyebrow">Step 2 of 2</div>
+        <h2 class="modal-title">A few more<br><span class="modal-title-sky">details.</span></h2>
+        <p class="modal-sub">Help Liam prepare. The more context the better.</p>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-field">
+          <label class="modal-label">Finance status</label>
+          <select class="modal-input" id="modal-finance">
+            <option value="">Select...</option>
+            <option value="pre_approved">Pre-approved — ready to move</option>
+            <option value="conditional">Conditional approval — awaiting final sign-off</option>
+            <option value="cash">Cash buyer — unconditional</option>
+            <option value="in_progress">Working on finance — not yet approved</option>
+            <option value="need_broker">Need a broker — can you connect me?</option>
+          </select>
+        </div>
+
+        <div class="modal-field">
+          <label class="modal-label">Preferred settlement</label>
+          <select class="modal-input" id="modal-settlement">
+            <option value="">No preference</option>
+            <option value="30">30 days</option>
+            <option value="45">45 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+            <option value="vendor_choice">Vendor's choice — flexible</option>
+          </select>
+        </div>
+
+        <div class="modal-field">
+          <label class="modal-label">Anything else Liam should know?</label>
+          <textarea class="modal-input" id="modal-notes" rows="3" style="resize:none;" placeholder="Conditions, timing, why this property, anything that helps..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="modal-submit" onclick="submitProceed()">
+          Engage concierge — $5,000 flat fee
+        </button>
+        <div class="modal-submit-hint">Liam's team will be in touch within one business day</div>
+      </div>
     </div>
 
-    <div class="modal-actions">
-      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
-      <button class="modal-submit" onclick="submitProceed()">Engage concierge — $5,000 flat fee</button>
+    <!-- Step 3: Confirmation -->
+    <div class="modal-step" id="mstep3" style="display:none;">
+      <div class="modal-confirm-screen">
+        <div class="modal-confirm-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M16 3L4 9v9c0 7.2 5.6 13.9 12 15.3C22.4 31.9 28 25.2 28 18V9L16 3z" stroke="var(--rose)" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 16l4 4 8-7" stroke="var(--rose)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="modal-confirm-title">You're in.</div>
+        <div class="modal-confirm-sub">
+          Liam's team has your brief. We'll be in touch within one business day to confirm next steps.
+        </div>
+        <div class="modal-confirm-property">
+          <div class="modal-confirm-addr" id="confirm-addr">2 Havilah Street, Morisset Park NSW 2264</div>
+          <div class="modal-confirm-meta">Concierge engaged · $5,000 flat fee</div>
+        </div>
+        <div class="modal-confirm-guarantee">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L2 3.5v4c0 3.2 2.5 6.1 5 6.8 2.5-.7 5-3.6 5-6.8v-4L7 1z" stroke="var(--rose)" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          $10K guarantee active
+        </div>
+        <button class="modal-done" onclick="closeModal()">Back to dashboard</button>
+      </div>
     </div>
+
   </div>
 </div>
 
@@ -1944,43 +2383,65 @@ function useSuggestion(id) {
 
 // Modal
 function openModal(type, addr, price, inspId) {
+  proceedStep1();
   document.getElementById('modalOverlay').classList.add('open');
-  if (addr) document.querySelector('.modal-prop-addr').textContent = addr;
-  if (price) document.querySelector('.modal-prop-meta').textContent = (addr ? addr.split(',')[0] : '') + ' · Asking: ' + price;
+  document.body.style.overflow = 'hidden';
+  if (addr) {
+    document.getElementById('modal-addr').textContent = addr;
+    document.getElementById('confirm-addr').textContent = addr;
+  }
+  if (price) {
+    document.getElementById('modal-meta').textContent = (addr ? addr.split(',')[0] : '') + ' · Asking: ' + price;
+  }
   if (inspId) {
     const suggest = document.getElementById(inspId + '-suggest');
     if (suggest && suggest.classList.contains('show') && suggest.dataset.price) {
-      const maxInput = document.querySelector('.modal-input');
+      const maxInput = document.getElementById('modal-max-price');
       if (maxInput) {
         maxInput.value = '$' + parseInt(suggest.dataset.price).toLocaleString();
-        maxInput.style.borderColor = 'var(--rose)';
-        const existing = document.getElementById('liam-modal-note');
-        if (!existing) {
-          const note = document.createElement('div');
-          note.id = 'liam-modal-note';
-          note.style.cssText = 'font-family:Figtree,sans-serif;font-size:11px;color:var(--rose);margin-top:6px;font-style:italic;';
-          note.textContent = 'Pre-filled from Liam\'s suggestion based on your inspection notes';
-          maxInput.parentNode.appendChild(note);
-        }
+        const hint = document.querySelector('#mstep1 .modal-hint');
+        if (hint) hint.textContent = "Pre-filled from Liam's inspection note analysis. You can adjust.";
       }
     }
   }
 }
+
+function proceedStep1() {
+  document.getElementById('mstep1').style.display = 'flex';
+  document.getElementById('mstep1').style.flexDirection = 'column';
+  document.getElementById('mstep2').style.display = 'none';
+  document.getElementById('mstep3').style.display = 'none';
+  ['msdot1','msdot2','msdot3'].forEach((id,i) => {
+    document.getElementById(id).className = 'modal-step-dot' + (i===0?' active':'');
+  });
+}
+
+function proceedStep2() {
+  const price = document.getElementById('modal-max-price').value.trim();
+  if (!price) {
+    document.getElementById('modal-max-price').style.borderColor = 'var(--rose)';
+    document.getElementById('modal-max-price').focus();
+    return;
+  }
+  document.getElementById('modal-max-price').style.borderColor = '';
+  document.getElementById('mstep1').style.display = 'none';
+  document.getElementById('mstep2').style.display = 'flex';
+  document.getElementById('mstep2').style.flexDirection = 'column';
+  document.getElementById('msdot1').className = 'modal-step-dot done';
+  document.getElementById('msdot2').className = 'modal-step-dot active';
+}
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 function submitProceed() {
-  closeModal();
-  // Show confirmation toast
-  const toast = document.createElement('div');
-  toast.style.cssText = `position:fixed;bottom:28px;right:28px;z-index:300;
-    background:#2A2A2A;border:1px solid rgba(232,180,184,0.3);border-radius:10px;
-    padding:14px 20px;font-family:'Figtree',sans-serif;font-size:13px;color:#F4F1EC;
-    box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.3s ease;`;
-  toast.innerHTML = `<strong style="color:#E8B4B8;">Request received.</strong><br>
-    <span style="color:#7FA8D4;font-size:11px;">Liam's team will be in touch within one business day.</span>`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+  // DEV: POST /api/tier3 — property, max_price, finance, settlement, notes
+  // → send confirmation email, route via referrer.com.au API
+  document.getElementById('mstep2').style.display = 'none';
+  document.getElementById('mstep3').style.display = 'flex';
+  document.getElementById('mstep3').style.flexDirection = 'column';
+  document.getElementById('msdot2').className = 'modal-step-dot done';
+  document.getElementById('msdot3').className = 'modal-step-dot active';
 }
 
 
@@ -2129,7 +2590,8 @@ setupEditTagInput('edit-need-input', 'edit-need-wrap');
 setupEditTagInput('edit-want-input', 'edit-want-wrap');
 
 // Close edit modal on overlay click
-document.getElementById('editBriefOverlay').addEventListener('click', function(e) {
+const _ebo = document.getElementById('editBriefOverlay');
+if (_ebo) _ebo.addEventListener('click', function(e) {
   if (e.target === this) closeEditBrief();
 });
 
@@ -2200,10 +2662,34 @@ function resumeSubscription() {
   }
 }
 
+
+// ── MOBILE SIDEBAR TOGGLE ──
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+  document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+}
+function closeSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.remove('open');
+  overlay.classList.remove('show');
+  document.body.style.overflow = '';
+}
+// Close sidebar when a nav item is clicked on mobile
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', function() {
+    if (window.innerWidth <= 768) closeSidebar();
+  });
+});
+
 // Account nav — wired inline on the element
 
 // Close modal on overlay click
-document.getElementById('modalOverlay').addEventListener('click', function(e) {
+const _mo = document.getElementById('modalOverlay');
+if (_mo) _mo.addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 </script>

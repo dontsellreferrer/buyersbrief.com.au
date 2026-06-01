@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import cmaHtml from './cma.html?raw';
+import cmaHtml from './2_Havilah_Street_Morisset_Park.html?raw';
 
 export default function CMA() {
   useEffect(() => {
@@ -14,7 +14,7 @@ export default function CMA() {
         console.error('Error executing CMA script:', e);
       }
     }
-  }, []);
+  }, [cmaHtml]);
 
   return (
     <div dangerouslySetInnerHTML={{ __html: cmaHtml }} />

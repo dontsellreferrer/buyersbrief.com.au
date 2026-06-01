@@ -174,47 +174,47 @@ nav {
 .page > *:nth-child(4) { animation-delay:0.2s; }
 .page > *:nth-child(5) { animation-delay:0.25s; }
 
-/* MOBILE RESPONSIVE */
+/* ═══════════════════════════════════════════════════
+   MOBILE — max-width 768px
+   ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  body { font-size: 14px; }
-  .shell { flex-direction: column; }
-  .header { padding: 16px; }
-  .header-nav { flex-direction: column; gap: 12px; }
-  .header-title { font-size: 24px; }
-  .header-sub { font-size: 12px; }
-  .page { padding: 16px; }
-  .section { padding: 16px; margin-bottom: 16px; }
-  .section-title { font-size: 18px; }
-  .grid { grid-template-columns: 1fr !important; gap: 12px; }
-  .card { padding: 12px; }
-  .card-title { font-size: 14px; }
-  .card-text { font-size: 12px; }
-  .btn { padding: 10px 16px; font-size: 12px; }
-  input, textarea { font-size: 14px; padding: 10px; }
-  .modal { width: 90vw; }
+
+  /* NAV */
+  nav { padding: 0 16px; height: 54px; }
+  .nav-logo img { height: 30px; }
+  .nav-back { font-size: 11px; }
+  .nav-tag { font-size: 9px; padding: 3px 10px; }
+
+  /* PAGE */
+  .page { padding: 80px 16px 60px; }
+
+  /* HERO */
+  .hero-title { font-size: clamp(26px, 7vw, 38px); }
+  .hero-sub { font-size: 14px; }
+
+  /* PARTNER CARDS — 3 col → 1 col */
+  .partner-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 32px; }
+  .partner-card { padding: 20px 16px; }
+  .partner-card-title { font-size: 15px; }
+  .partner-card-desc { font-size: 13px; }
+
+  /* TWO COL → SINGLE */
+  .two-col { grid-template-columns: 1fr; gap: 16px; }
+  .referrer-features { grid-template-columns: 1fr; }
+
+  /* FORM */
+  .form-section { padding: 20px 16px; }
+  .field-row { grid-template-columns: 1fr; gap: 10px; }
+  .field-input, .field-select { font-size: 16px; }
+  .btn-submit { font-size: 14px; padding: 14px; }
 }
 
-@media (max-width: 480px) {
-  body { font-size: 12px; }
-  .header { padding: 12px; }
-  .header-title { font-size: 20px; }
-  .header-sub { font-size: 11px; }
-  .page { padding: 12px; }
-  .section { padding: 12px; margin-bottom: 12px; }
-  .section-title { font-size: 16px; }
-  .card { padding: 10px; }
-  .card-title { font-size: 12px; }
-  .card-text { font-size: 11px; }
-  .btn { padding: 8px 12px; font-size: 11px; }
-  input, textarea { font-size: 16px; padding: 8px; }
-  .modal { width: 95vw; }
-}
 </style>
 </head>
 <body>
 
 <nav>
-  <a href="index.html" class="nav-back">
+  <a href="https://buyersbrief.com.au" class="nav-back">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
       <path d="M9 11L5 7l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
