@@ -1476,6 +1476,11 @@ body {
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:rgba(127,168,212,0.2); border-radius:2px; }
 </style>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/buyersbrief_favicon_32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/buyersbrief_favicon_16.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="/buyersbrief_favicon_192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/buyersbrief_favicon_512.png">
 </head>
 <body>
 
@@ -1825,7 +1830,7 @@ body {
               <div class="hotlist-actions" style="flex-direction:column;gap:5px;">
                 <button class="btn-proceed" id="h1-proceed" onclick="openModal('proceed','22 Scenic Dr, Merewether NSW 2291','$1,050,000','insp1')">Wanna buy this one?</button>
                 <!-- DEV NOTE: CMA URL pattern → /cma/[suburb-slug]/[address-slug] e.g. /cma/morisset-park/2-havilah-street -->
-                <button class="btn-cma" onclick="runCMA('2_Havilah_Street_Morisset_Park.html')">View CMA →</button>
+                <button class="btn-cma" onclick="window.location.href='https://buyersbrief.com.au/cma/2_Havilah_Street_Morisset_Park'">View CMA →</button>
                 <button class="btn-remove">Remove</button>
               </div>
             </div>
@@ -1877,7 +1882,7 @@ body {
               <div class="hotlist-price">$879,000</div>
               <div class="hotlist-actions" style="flex-direction:column;gap:5px;">
                 <button class="btn-proceed" onclick="openModal('proceed')">Wanna buy this one?</button>
-                <button class="btn-cma" onclick="runCMA(null)">Run full CMA</button>
+                <button class="btn-cma" onclick="runCMA('/cma/merewether/8-dixon-street')">Run full CMA</button><!-- DEV: POST /api/cma/generate, then navigate to returned URL -->
                 <button class="btn-remove">Remove</button>
               </div>
             </div>
@@ -2481,7 +2486,9 @@ function runCMA(cmaUrl) {
       // Small pause then navigate
       setTimeout(() => {
         overlay.classList.remove('show');
-        window.open(cmaUrl, '_blank');
+        if (cmaUrl) window.location.href = cmaUrl;
+        // DEV: in production use /cma/[suburb-slug]/[address-slug]
+        // e.g. window.location.href = '/cma/morisset-park/2-havilah-street';
       }, 400);
       return;
     }
