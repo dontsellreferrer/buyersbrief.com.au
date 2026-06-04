@@ -305,8 +305,17 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "No buyer brief found to search against" });
         }
 
-        const matches = await runAISearchForBrief(brief);
-        return { success: true, brief, matches };
+        try {
+          const matches = await runAISearchForBrief(brief);
+          return { success: true, brief, matches };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Search generation failed';
+          if (message.includes('No direct LLM provider is configured')) {
+            console.warn('[Search] AI provider is not configured; returning an empty match set for dashboard handoff');
+            return { success: false, brief, matches: [], message };
+          }
+          throw error;
+        }
       }),
 
     matches: protectedProcedure

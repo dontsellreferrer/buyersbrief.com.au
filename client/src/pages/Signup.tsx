@@ -136,8 +136,12 @@ export default function Signup() {
       financeStatus: briefData.financeStatus ?? '',
     });
 
-    setSignupBusy(true, 'Liam is finding your matches…');
-    await runSearch.mutateAsync({ briefId: saved.brief.id });
+    setSignupBusy(true, 'Liam is preparing your dashboard…');
+    try {
+      await runSearch.mutateAsync({ briefId: saved.brief.id });
+    } catch (error) {
+      console.warn('[Signup] Search generation failed after brief save; continuing to dashboard', error);
+    }
     sessionStorage.removeItem('briefData');
     sessionStorage.removeItem('briefBasics');
     await utils.auth.me.invalidate();
