@@ -167,21 +167,25 @@ export default function BriefIntake() {
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [budgetValue, setBudgetValue] = useState(850000);
 
-  // Load brief basics from URL params or sessionStorage
+  // Load brief basics from URL params or sessionStorage.
+  // Wouter's location value does not reliably include the query string, so read
+  // window.location.search directly when the /brief route mounts.
   useEffect(() => {
-    const params = new URLSearchParams(location.split('?')[1] || '');
+    const params = new URLSearchParams(window.location.search);
     const urlData: Partial<BriefData> = {};
-    
+    const intent = params.get('intent');
+
     if (params.get('suburbs')) urlData.suburb = params.get('suburbs')!;
     if (params.get('type')) urlData.propertyType = params.get('type')!;
     if (params.get('beds')) urlData.beds = params.get('beds')!;
     if (params.get('baths')) urlData.baths = params.get('baths')!;
     if (params.get('parking')) urlData.parking = params.get('parking')!;
     if (params.get('budget')) urlData.budget = params.get('budget')!;
-    if (params.get('intent')) urlData.intent = params.get('intent') as 'live' | 'invest' | 'both';
+    if (intent === 'live' || intent === 'invest' || intent === 'both') urlData.intent = intent;
 
     if (Object.keys(urlData).length > 0) {
       setBriefData((prev) => ({ ...prev, ...urlData }));
+      sessionStorage.setItem('briefBasics', JSON.stringify(urlData));
       // Auto-advance to Step 1 if suburbs, beds, and budget are all present
       if (urlData.suburb && urlData.beds && urlData.budget) {
         setStepStates({ 0: false, 1: true, 2: false, 3: false, 4: false, 5: false, 6: false });
@@ -192,12 +196,12 @@ export default function BriefIntake() {
       const saved = sessionStorage.getItem('briefBasics');
       if (saved) {
         try {
-          const basics = JSON.parse(saved);
+          const basics = JSON.parse(saved) as Partial<BriefData>;
           setBriefData((prev) => ({ ...prev, ...basics }));
         } catch { /* ignore */ }
       }
     }
-  }, [location]);
+  }, []);
 
   const toggleStep = (num: number) => {
     setStepStates((prev) => {

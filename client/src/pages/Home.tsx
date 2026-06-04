@@ -79,6 +79,16 @@ export default function Home() {
       if (budget) params.set('budget', budget);
       if (intent) params.set('intent', intent);
 
+      sessionStorage.setItem('briefBasics', JSON.stringify({
+        suburb: suburbs,
+        propertyType: type,
+        beds,
+        baths,
+        parking,
+        budget,
+        intent: intent || 'live',
+      }));
+
       navigate(`/brief?${params.toString()}`);
     };
   }, [navigate]);
