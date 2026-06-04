@@ -5,8 +5,101 @@ import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { createSessionToken } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
-import { createUser, getUserByEmail, updateLastSignedIn } from "./db";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  createBrief,
+  createCma,
+  createHotlistEntry,
+  createUser,
+  getBriefById,
+  getBriefsByUserId,
+  getCmaBySlug,
+  getHotlistByUserId,
+  getLatestBriefByUserId,
+  getMatchById,
+  getMatchesByBriefId,
+  getUserByEmail,
+  removeHotlistEntry,
+  updateBrief,
+  updateHotlistEntry,
+  updateLastSignedIn,
+  updateUserNotificationPrefs,
+  updateUserTier,
+} from "./db";
+import { runAISearchForBrief } from "./services/search";
+
+const nullableString = z.string().trim().optional().nullable();
+const purchaseIntentSchema = z.enum(["live", "invest", "both"]);
+const tierSchema = z.enum(["free", "tier1", "tier2", "tier3"]);
+const listInputSchema = z.union([z.array(z.string()), z.string()]).optional().nullable();
+
+const briefInputSchema = z.object({
+  suburb: nullableString,
+  suburbs: listInputSchema,
+  propertyType: nullableString,
+  type: nullableString,
+  beds: nullableString,
+  baths: nullableString,
+  parking: nullableString,
+  budget: z.union([z.string(), z.number()]).optional().nullable(),
+  budgetDisplay: nullableString,
+  intent: purchaseIntentSchema.optional(),
+  purchaseIntent: purchaseIntentSchema.optional(),
+  flex: nullableString,
+  radiusKm: z.number().int().positive().optional().nullable(),
+  nonNegotiables: listInputSchema,
+  needs: listInputSchema,
+  wants: listInputSchema,
+  niceToHaves: listInputSchema,
+  story: nullableString,
+  buyerStory: nullableString,
+  finance: nullableString,
+  financeStatus: nullableString,
+  timeline: nullableString,
+  landMinM2: z.number().int().positive().optional().nullable(),
+});
+
+function normalizeList(value: z.infer<typeof listInputSchema>): string | null {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    const cleaned = value.map((item) => item.trim()).filter(Boolean);
+    return cleaned.length > 0 ? JSON.stringify(cleaned) : null;
+  }
+  const cleaned = value.trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+function normalizeSuburbs(input: Partial<z.infer<typeof briefInputSchema>>): string | null {
+  if (input.suburbs) return normalizeList(input.suburbs);
+  return input.suburb?.trim() || null;
+}
+
+function parseBudget(value: string | number | null | undefined): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  if (typeof value !== "string") return null;
+  const numeric = Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function makeBudgetDisplay(value: string | number | null | undefined, parsed: number | null): string | null {
+  if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  if (typeof value === "number") return `$${value.toLocaleString("en-AU")}`;
+  return parsed ? `$${parsed.toLocaleString("en-AU")}` : null;
+}
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "property";
+}
+
+function ensureCurrentUser(ctx: { user: { id: number } | null }) {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication required" });
+  }
+  return ctx.user;
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -24,7 +117,6 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        // Check if user already exists
         const existing = await getUserByEmail(input.email);
         if (existing) {
           throw new TRPCError({
@@ -33,10 +125,7 @@ export const appRouter = router({
           });
         }
 
-        // Hash password
         const passwordHash = await bcrypt.hash(input.password, 12);
-
-        // Create user
         const user = await createUser({
           email: input.email,
           passwordHash,
@@ -52,7 +141,6 @@ export const appRouter = router({
           });
         }
 
-        // Sign JWT and set cookie
         const token = await createSessionToken(user.id, user.email);
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, token, {
@@ -81,28 +169,18 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        // Find user
         const user = await getUserByEmail(input.email);
         if (!user) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Invalid email or password",
-          });
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
         }
 
-        // Verify password
         const valid = await bcrypt.compare(input.password, user.passwordHash);
         if (!valid) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Invalid email or password",
-          });
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
         }
 
-        // Update last signed in
         await updateLastSignedIn(user.id);
 
-        // Sign JWT and set cookie
         const token = await createSessionToken(user.id, user.email);
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, token, {
@@ -130,7 +208,252 @@ export const appRouter = router({
     }),
   }),
 
-  // TODO: add feature routers here
+  brief: router({
+    create: protectedProcedure
+      .input(briefInputSchema)
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const parsedBudget = parseBudget(input.budget ?? input.budgetDisplay);
+        const brief = await createBrief({
+          userId: user.id,
+          suburbs: normalizeSuburbs(input),
+          type: input.propertyType || input.type || null,
+          beds: input.beds || null,
+          baths: input.baths || null,
+          parking: input.parking || null,
+          budget: parsedBudget,
+          budgetDisplay: makeBudgetDisplay(input.budgetDisplay ?? input.budget, parsedBudget),
+          purchaseIntent: input.intent || input.purchaseIntent || "live",
+          flex: input.flex || null,
+          radiusKm: input.radiusKm ?? null,
+          nonNegotiables: normalizeList(input.nonNegotiables),
+          needs: normalizeList(input.needs),
+          wants: normalizeList(input.wants),
+          niceToHaves: normalizeList(input.niceToHaves),
+          story: input.buyerStory || input.story || null,
+          finance: input.financeStatus || input.finance || null,
+          financeStatus: input.financeStatus || input.finance || null,
+          timeline: input.timeline || null,
+          landMinM2: input.landMinM2 ?? null,
+          status: "active",
+          tier: "free",
+        });
+
+        if (!brief) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to save buyer brief" });
+        }
+
+        return { success: true, brief };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({ id: z.number().int().positive(), data: briefInputSchema.partial() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const parsedBudget = parseBudget(input.data.budget ?? input.data.budgetDisplay);
+        const suburbs = normalizeSuburbs(input.data);
+        const brief = await updateBrief(input.id, user.id, {
+          ...(suburbs ? { suburbs } : {}),
+          ...(input.data.propertyType || input.data.type ? { type: input.data.propertyType || input.data.type || null } : {}),
+          ...(input.data.beds ? { beds: input.data.beds } : {}),
+          ...(input.data.baths ? { baths: input.data.baths } : {}),
+          ...(input.data.parking ? { parking: input.data.parking } : {}),
+          ...(parsedBudget ? { budget: parsedBudget, budgetDisplay: makeBudgetDisplay(input.data.budgetDisplay ?? input.data.budget, parsedBudget) } : {}),
+          ...(input.data.intent || input.data.purchaseIntent ? { purchaseIntent: input.data.intent || input.data.purchaseIntent || "live" } : {}),
+          ...(input.data.flex ? { flex: input.data.flex } : {}),
+          ...(input.data.nonNegotiables ? { nonNegotiables: normalizeList(input.data.nonNegotiables) } : {}),
+          ...(input.data.needs ? { needs: normalizeList(input.data.needs) } : {}),
+          ...(input.data.wants ? { wants: normalizeList(input.data.wants) } : {}),
+          ...(input.data.niceToHaves ? { niceToHaves: normalizeList(input.data.niceToHaves) } : {}),
+          ...(input.data.buyerStory || input.data.story ? { story: input.data.buyerStory || input.data.story || null } : {}),
+          ...(input.data.financeStatus || input.data.finance ? { finance: input.data.financeStatus || input.data.finance || null, financeStatus: input.data.financeStatus || input.data.finance || null } : {}),
+          ...(input.data.timeline ? { timeline: input.data.timeline } : {}),
+        });
+
+        if (!brief) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Brief not found" });
+        }
+
+        return { success: true, brief, staleCount: 0, staleProperties: [] as unknown[] };
+      }),
+
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const user = ensureCurrentUser(ctx);
+      return getBriefsByUserId(user.id);
+    }),
+
+    get: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const brief = await getBriefById(input.id, user.id);
+        if (!brief) throw new TRPCError({ code: "NOT_FOUND", message: "Brief not found" });
+        return brief;
+      }),
+  }),
+
+  search: router({
+    run: protectedProcedure
+      .input(z.object({ briefId: z.number().int().positive().optional() }).optional())
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const brief = input?.briefId
+          ? await getBriefById(input.briefId, user.id)
+          : await getLatestBriefByUserId(user.id);
+
+        if (!brief) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "No buyer brief found to search against" });
+        }
+
+        const matches = await runAISearchForBrief(brief);
+        return { success: true, brief, matches };
+      }),
+
+    matches: protectedProcedure
+      .input(z.object({ briefId: z.number().int().positive() }))
+      .query(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        return getMatchesByBriefId(input.briefId, user.id);
+      }),
+  }),
+
+  dashboard: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const user = ensureCurrentUser(ctx);
+      const briefs = await getBriefsByUserId(user.id);
+      const activeBrief = briefs[0] || null;
+      const matches = activeBrief ? await getMatchesByBriefId(activeBrief.id, user.id) : [];
+      const hotlist = await getHotlistByUserId(user.id);
+
+      return {
+        user: ctx.user,
+        activeBrief,
+        briefs,
+        matches,
+        hotlist,
+      };
+    }),
+  }),
+
+  hotlist: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const user = ensureCurrentUser(ctx);
+      return getHotlistByUserId(user.id);
+    }),
+
+    add: protectedProcedure
+      .input(z.object({ matchId: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const match = await getMatchById(input.matchId, user.id);
+        if (!match) throw new TRPCError({ code: "NOT_FOUND", message: "Match not found" });
+
+        const entry = await createHotlistEntry({
+          userId: user.id,
+          matchId: match.id,
+          lastPrice: match.price ?? null,
+          status: "active",
+        });
+
+        if (!entry) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to add property to hotlist" });
+        }
+        return { success: true, entry };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        inspectionNote: nullableString,
+        tier3Requested: z.boolean().optional(),
+        tier3MaxPrice: z.number().int().positive().optional().nullable(),
+        tier2Requested: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const entry = await updateHotlistEntry(input.id, user.id, {
+          inspectionNote: input.inspectionNote ?? undefined,
+          tier3Requested: input.tier3Requested,
+          tier3MaxPrice: input.tier3MaxPrice ?? undefined,
+          tier2Requested: input.tier2Requested,
+        });
+        if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: "Hotlist entry not found" });
+        return { success: true, entry };
+      }),
+
+    remove: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const success = await removeHotlistEntry(input.id, user.id);
+        return { success };
+      }),
+  }),
+
+  cma: router({
+    generate: protectedProcedure
+      .input(z.object({ hotlistId: z.number().int().positive(), address: z.string().min(1), suburb: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        const addressSlug = slugify(input.address);
+        const suburbSlug = slugify(input.suburb || input.address.split(",").slice(-2, -1)[0] || "property");
+        const cma = await createCma({
+          hotlistId: input.hotlistId,
+          address: input.address,
+          suburbSlug,
+          addressSlug,
+          confidence: "medium",
+          cmaData: {
+            address: input.address,
+            summary: "Initial CMA placeholder generated from the hotlisted property context. Full comparable-sales enrichment can be attached to this record as provider integrations are added.",
+            generatedBy: "buyersbrief-direct-backend",
+          },
+        });
+        if (!cma) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to generate CMA" });
+        return { success: true, cma, url: `/cma/${suburbSlug}/${addressSlug}` };
+      }),
+
+    bySlug: publicProcedure
+      .input(z.object({ suburbSlug: z.string().min(1), addressSlug: z.string().min(1) }))
+      .query(async ({ input }) => {
+        const cma = await getCmaBySlug(input.suburbSlug, input.addressSlug);
+        if (!cma) throw new TRPCError({ code: "NOT_FOUND", message: "CMA not found" });
+        return cma;
+      }),
+  }),
+
+  subscription: router({
+    get: protectedProcedure.query(({ ctx }) => {
+      const user = ensureCurrentUser(ctx);
+      return {
+        tier: ctx.user?.tier || "free",
+        userId: user.id,
+      };
+    }),
+
+    updateTier: protectedProcedure
+      .input(z.object({ tier: tierSchema }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const updated = await updateUserTier(user.id, input.tier);
+        if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update tier" });
+        return { success: true, tier: updated.tier };
+      }),
+
+    notifications: protectedProcedure
+      .input(z.object({
+        dailyEmail: z.boolean().optional(),
+        hotSms: z.boolean().optional(),
+        priceDrop: z.boolean().optional(),
+        statusChange: z.boolean().optional(),
+        weeklyDigest: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const updated = await updateUserNotificationPrefs(user.id, input);
+        if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update notification preferences" });
+        return { success: true, notifications: updated.notifications };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

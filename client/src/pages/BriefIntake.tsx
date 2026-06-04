@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { Logo } from '@/components/Logo';
+import { useAuth } from '@/_core/hooks/useAuth';
+import { trpc } from '@/lib/trpc';
 
 interface BriefData {
   suburb: string;
@@ -147,6 +149,11 @@ function StepCard({
 export default function BriefIntake() {
   const [location] = useLocation();
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const createBrief = trpc.brief.create.useMutation();
+  const runSearch = trpc.search.run.useMutation();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const isSubmitting = createBrief.isPending || runSearch.isPending;
   const [stepStates, setStepStates] = useState<Record<number, boolean>>({
     0: true, 1: false, 2: false, 3: false, 4: false, 5: false, 6: false,
   });
@@ -225,10 +232,41 @@ export default function BriefIntake() {
 
   const sliderPercent = ((budgetValue - 200000) / (3000000 - 200000)) * 100;
 
-  const handleSubmit = () => {
-    // Save brief data to sessionStorage for signup page
+  const handleSubmit = async () => {
+    setSubmitError(null);
     sessionStorage.setItem('briefData', JSON.stringify(briefData));
-    navigate('/signup');
+
+    if (!user) {
+      navigate('/signup');
+      return;
+    }
+
+    try {
+      const saved = await createBrief.mutateAsync({
+        suburb: briefData.suburb,
+        propertyType: briefData.propertyType,
+        beds: briefData.beds,
+        baths: briefData.baths,
+        parking: briefData.parking,
+        budget: briefData.budgetCeiling || briefData.budget,
+        budgetDisplay: briefData.budgetCeiling || briefData.budget,
+        intent: briefData.intent,
+        nonNegotiables: briefData.nonNegotiables,
+        needs: briefData.needs,
+        wants: briefData.wants,
+        niceToHaves: briefData.niceToHaves,
+        buyerStory: briefData.buyerStory,
+        timeline: briefData.timeline,
+        financeStatus: briefData.financeStatus,
+      });
+
+      await runSearch.mutateAsync({ briefId: saved.brief.id });
+      sessionStorage.removeItem('briefData');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('[BriefIntake] Failed to submit brief', error);
+      setSubmitError(error instanceof Error ? error.message : 'We could not submit your brief. Please try again.');
+    }
   };
 
   return (
@@ -675,12 +713,17 @@ export default function BriefIntake() {
         </div>
 
         {/* Submit Button */}
-        <button className="step-cta" onClick={handleSubmit} style={{ marginTop: 16 }}>
+        {submitError && (
+          <div style={{ marginTop: 16, color: '#E8614A', fontFamily: "'Figtree', sans-serif", fontSize: 13, lineHeight: 1.5 }}>
+            {submitError}
+          </div>
+        )}
+        <button className="step-cta" onClick={handleSubmit} disabled={isSubmitting} style={{ marginTop: 16, opacity: isSubmitting ? 0.75 : 1, cursor: isSubmitting ? 'wait' : 'pointer' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          Find my matches
+          {isSubmitting ? (runSearch.isPending ? 'Liam is finding matches…' : 'Saving brief…') : 'Find my matches'}
         </button>
       </div>
     </div>
