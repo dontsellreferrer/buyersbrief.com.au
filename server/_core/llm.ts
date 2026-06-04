@@ -1,5 +1,3 @@
-import { ENV } from "./env";
-
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
 export type TextContent = {
@@ -19,7 +17,7 @@ export type FileContent = {
   type: "file_url";
   file_url: {
     url: string;
-    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4" ;
+    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4";
   };
 };
 
@@ -50,10 +48,20 @@ export type ToolChoiceExplicit = {
   };
 };
 
-export type ToolChoice =
-  | ToolChoicePrimitive
-  | ToolChoiceByName
-  | ToolChoiceExplicit;
+export type ToolChoice = ToolChoicePrimitive | ToolChoiceByName | ToolChoiceExplicit;
+
+export type JsonSchema = {
+  name: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
+};
+
+export type OutputSchema = JsonSchema;
+
+export type ResponseFormat =
+  | { type: "text" }
+  | { type: "json_object" }
+  | { type: "json_schema"; json_schema: JsonSchema };
 
 export type InvokeParams = {
   messages: Message[];
@@ -66,6 +74,7 @@ export type InvokeParams = {
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
+  model?: string;
 };
 
 export type ToolCall = {
@@ -97,127 +106,49 @@ export type InvokeResult = {
   };
 };
 
-export type JsonSchema = {
-  name: string;
-  schema: Record<string, unknown>;
-  strict?: boolean;
-};
+const ensureArray = (value: MessageContent | MessageContent[]): MessageContent[] =>
+  Array.isArray(value) ? value : [value];
 
-export type OutputSchema = JsonSchema;
+const contentToText = (content: MessageContent | MessageContent[]): string =>
+  ensureArray(content)
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (part.type === "text") return part.text;
+      if (part.type === "image_url") return `[image: ${part.image_url.url}]`;
+      if (part.type === "file_url") return `[file: ${part.file_url.url}]`;
+      return JSON.stringify(part);
+    })
+    .join("\n");
 
-export type ResponseFormat =
-  | { type: "text" }
-  | { type: "json_object" }
-  | { type: "json_schema"; json_schema: JsonSchema };
-
-const ensureArray = (
-  value: MessageContent | MessageContent[]
-): MessageContent[] => (Array.isArray(value) ? value : [value]);
-
-const normalizeContentPart = (
-  part: MessageContent
-): TextContent | ImageContent | FileContent => {
-  if (typeof part === "string") {
-    return { type: "text", text: part };
-  }
-
-  if (part.type === "text") {
-    return part;
-  }
-
-  if (part.type === "image_url") {
-    return part;
-  }
-
-  if (part.type === "file_url") {
-    return part;
-  }
-
-  throw new Error("Unsupported message content part");
-};
-
-const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
-
-  if (role === "tool" || role === "function") {
-    const content = ensureArray(message.content)
-      .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
-      .join("\n");
-
-    return {
-      role,
-      name,
-      tool_call_id,
-      content,
-    };
-  }
-
-  const contentParts = ensureArray(message.content).map(normalizeContentPart);
-
-  // If there's only text content, collapse to a single string for compatibility
-  if (contentParts.length === 1 && contentParts[0].type === "text") {
-    return {
-      role,
-      name,
-      content: contentParts[0].text,
-    };
-  }
-
-  return {
-    role,
-    name,
-    content: contentParts,
-  };
-};
+const normalizeOpenAIMessage = (message: Message) => ({
+  role: message.role === "function" ? "tool" : message.role,
+  content: contentToText(message.content),
+  ...(message.name ? { name: message.name } : {}),
+  ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+});
 
 const normalizeToolChoice = (
   toolChoice: ToolChoice | undefined,
-  tools: Tool[] | undefined
+  tools: Tool[] | undefined,
 ): "none" | "auto" | ToolChoiceExplicit | undefined => {
   if (!toolChoice) return undefined;
-
-  if (toolChoice === "none" || toolChoice === "auto") {
-    return toolChoice;
-  }
+  if (toolChoice === "none" || toolChoice === "auto") return toolChoice;
 
   if (toolChoice === "required") {
     if (!tools || tools.length === 0) {
-      throw new Error(
-        "tool_choice 'required' was provided but no tools were configured"
-      );
+      throw new Error("tool_choice 'required' was provided but no tools were configured");
     }
-
     if (tools.length > 1) {
-      throw new Error(
-        "tool_choice 'required' needs a single tool or specify the tool name explicitly"
-      );
+      throw new Error("tool_choice 'required' needs a single tool or specify the tool name explicitly");
     }
-
-    return {
-      type: "function",
-      function: { name: tools[0].function.name },
-    };
+    return { type: "function", function: { name: tools[0].function.name } };
   }
 
   if ("name" in toolChoice) {
-    return {
-      type: "function",
-      function: { name: toolChoice.name },
-    };
+    return { type: "function", function: { name: toolChoice.name } };
   }
 
   return toolChoice;
-};
-
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
 };
 
 const normalizeResponseFormat = ({
@@ -230,27 +161,12 @@ const normalizeResponseFormat = ({
   response_format?: ResponseFormat;
   outputSchema?: OutputSchema;
   output_schema?: OutputSchema;
-}):
-  | { type: "json_schema"; json_schema: JsonSchema }
-  | { type: "text" }
-  | { type: "json_object" }
-  | undefined => {
+}): ResponseFormat | undefined => {
   const explicitFormat = responseFormat || response_format;
-  if (explicitFormat) {
-    if (
-      explicitFormat.type === "json_schema" &&
-      !explicitFormat.json_schema?.schema
-    ) {
-      throw new Error(
-        "responseFormat json_schema requires a defined schema object"
-      );
-    }
-    return explicitFormat;
-  }
+  if (explicitFormat) return explicitFormat;
 
   const schema = outputSchema || output_schema;
   if (!schema) return undefined;
-
   if (!schema.name || !schema.schema) {
     throw new Error("outputSchema requires both name and schema");
   }
@@ -265,68 +181,143 @@ const normalizeResponseFormat = ({
   };
 };
 
-export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+function getJsonInstruction(format?: ResponseFormat): string {
+  if (!format || format.type === "text") return "";
+  if (format.type === "json_object") {
+    return "Return only a valid JSON object. Do not wrap it in markdown fences or explanatory prose.";
+  }
+  return `Return only valid JSON matching this JSON Schema. Do not wrap it in markdown fences or explanatory prose. Schema: ${JSON.stringify(format.json_schema.schema)}`;
+}
 
-  const {
-    messages,
-    tools,
-    toolChoice,
-    tool_choice,
-    outputSchema,
-    output_schema,
-    responseFormat,
-    response_format,
-  } = params;
+function providerTimeoutMs(): number {
+  const value = Number(process.env.LLM_TIMEOUT_MS || "60000");
+  return Number.isFinite(value) && value > 0 ? value : 60000;
+}
+
+async function invokeOpenAI(params: InvokeParams, responseFormat?: ResponseFormat): Promise<InvokeResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
-    messages: messages.map(normalizeMessage),
+    model: params.model || process.env.OPENAI_MODEL || "gpt-4.1-nano",
+    messages: params.messages.map(normalizeOpenAIMessage),
+    max_tokens: params.max_tokens || params.maxTokens || 4096,
   };
 
-  if (tools && tools.length > 0) {
-    payload.tools = tools;
-  }
+  if (params.tools?.length) payload.tools = params.tools;
+  const toolChoice = normalizeToolChoice(params.toolChoice || params.tool_choice, params.tools);
+  if (toolChoice) payload.tool_choice = toolChoice;
+  if (responseFormat?.type === "json_object") payload.response_format = { type: "json_object" };
+  if (responseFormat?.type === "json_schema") payload.response_format = responseFormat;
 
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
-  if (normalizedToolChoice) {
-    payload.tool_choice = normalizedToolChoice;
-  }
-
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
-  }
-
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat,
-    response_format,
-    outputSchema,
-    output_schema,
-  });
-
-  if (normalizedResponseFormat) {
-    payload.response_format = normalizedResponseFormat;
-  }
-
-  const response = await fetch(resolveApiUrl(), {
+  const baseUrl = (process.env.OPENAI_API_BASE || "https://api.openai.com/v1").replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(providerTimeoutMs()),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    throw new Error(`OpenAI invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
   }
 
-  return (await response.json()) as InvokeResult;
+  const data = await response.json() as InvokeResult & { error?: { message?: string } | string };
+  if (data.error) {
+    const message = typeof data.error === "string" ? data.error : data.error.message || JSON.stringify(data.error);
+    throw new Error(`OpenAI invoke failed: ${message}`);
+  }
+  if (!Array.isArray(data.choices)) {
+    throw new Error(`OpenAI invoke failed: response did not include choices (${JSON.stringify(Object.keys(data))})`);
+  }
+  return data;
+}
+
+async function invokeAnthropic(params: InvokeParams, responseFormat?: ResponseFormat): Promise<InvokeResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
+
+  const systemParts: string[] = [];
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  for (const message of params.messages) {
+    if (message.role === "system") {
+      systemParts.push(contentToText(message.content));
+      continue;
+    }
+
+    const role = message.role === "assistant" ? "assistant" : "user";
+    messages.push({ role, content: contentToText(message.content) });
+  }
+
+  const jsonInstruction = getJsonInstruction(responseFormat);
+  if (jsonInstruction) systemParts.push(jsonInstruction);
+
+  const payload = {
+    model: params.model || process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+    max_tokens: params.max_tokens || params.maxTokens || 4096,
+    system: systemParts.join("\n\n"),
+    messages,
+  };
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(providerTimeoutMs()),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Anthropic invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+  }
+
+  const data = await response.json() as {
+    id: string;
+    model: string;
+    stop_reason?: string;
+    usage?: { input_tokens?: number; output_tokens?: number };
+    content?: Array<{ type: string; text?: string }>;
+  };
+  const text = data.content?.filter((part) => part.type === "text").map((part) => part.text || "").join("\n") || "";
+  const promptTokens = data.usage?.input_tokens || 0;
+  const completionTokens = data.usage?.output_tokens || 0;
+
+  return {
+    id: data.id,
+    created: Math.floor(Date.now() / 1000),
+    model: data.model,
+    choices: [{
+      index: 0,
+      message: { role: "assistant", content: text },
+      finish_reason: data.stop_reason || null,
+    }],
+    usage: {
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: promptTokens + completionTokens,
+    },
+  };
+}
+
+export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  const responseFormat = normalizeResponseFormat(params);
+
+  if (process.env.ANTHROPIC_API_KEY) {
+    return invokeAnthropic(params, responseFormat);
+  }
+
+  if (process.env.OPENAI_API_KEY) {
+    return invokeOpenAI(params, responseFormat);
+  }
+
+  throw new Error("No direct LLM provider is configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.");
 }

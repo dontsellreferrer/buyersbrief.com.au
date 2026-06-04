@@ -1,408 +1,325 @@
-import { useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/_core/hooks/useAuth';
-import dashboardHTML from './dashboard.html?raw';
+import { trpc } from '@/lib/trpc';
+
+type MatchCard = {
+  id: number;
+  address: string;
+  suburb: string | null;
+  state: string | null;
+  postcode: string | null;
+  propertyType: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  parking: string | null;
+  priceDisplay: string | null;
+  price: number | null;
+  score: number;
+  daysOnMarket: number | null;
+  listingStatus: string | null;
+  listingUrl: string | null;
+  liamNote: string | null;
+  scoreBreakdown: unknown;
+};
+
+function money(value: number | null | undefined, fallback = 'POA') {
+  if (!value) return fallback;
+  return `$${value.toLocaleString('en-AU')}`;
+}
+
+function asList(value: unknown, key: string): string[] {
+  if (!value || typeof value !== 'object') return [];
+  const candidate = (value as Record<string, unknown>)[key];
+  return Array.isArray(candidate) ? candidate.map(String).filter(Boolean) : [];
+}
+
+function parseJsonList(value: string | null | undefined): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+  } catch {
+    // Stored free text is also valid brief context.
+  }
+  return value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+}
+
+function statusLabel(status: string | null | undefined) {
+  if (!status) return 'Active';
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function MatchCardView({
+  match,
+  isHotlisted,
+  onHotlist,
+  hotlisting,
+}: {
+  match: MatchCard;
+  isHotlisted: boolean;
+  onHotlist: () => void;
+  hotlisting: boolean;
+}) {
+  const needsMet = asList(match.scoreBreakdown, 'needsMet');
+  const wantsMet = asList(match.scoreBreakdown, 'wantsMet');
+  const flags = asList(match.scoreBreakdown, 'nnFlags');
+
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">{statusLabel(match.listingStatus)}</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{match.score}% match</span>
+            {typeof match.daysOnMarket === 'number' && (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{match.daysOnMarket} days listed</span>
+            )}
+          </div>
+          <h2 className="text-xl font-semibold tracking-tight text-slate-950">{match.address}</h2>
+          <p className="mt-1 text-sm text-slate-500">{[match.suburb, match.state, match.postcode].filter(Boolean).join(' ')}</p>
+          <p className="mt-3 text-sm text-slate-700">
+            {[match.bedrooms ? `${match.bedrooms} bed` : null, match.bathrooms ? `${match.bathrooms} bath` : null, match.parking ? `${match.parking} parking` : null, match.propertyType].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+        <div className="min-w-[180px] text-left lg:text-right">
+          <div className="text-2xl font-bold text-slate-950">{match.priceDisplay || money(match.price)}</div>
+          <div className="mt-3 flex flex-wrap gap-2 lg:justify-end">
+            {match.listingUrl && (
+              <a className="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-sky-400 hover:text-sky-700" href={match.listingUrl} target="_blank" rel="noreferrer">View listing</a>
+            )}
+            <button
+              className="rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              onClick={onHotlist}
+              disabled={isHotlisted || hotlisting}
+            >
+              {isHotlisted ? 'Hotlisted' : hotlisting ? 'Adding…' : 'Add to hotlist'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+        <strong className="text-slate-950">Liam’s note:</strong> {match.liamNote || 'This property has been matched against your saved buyer brief.'}
+      </div>
+
+      {(needsMet.length > 0 || wantsMet.length > 0 || flags.length > 0) && (
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <FeatureList title="Needs met" items={needsMet} tone="emerald" />
+          <FeatureList title="Wants met" items={wantsMet} tone="sky" />
+          <FeatureList title="Watch-outs" items={flags} tone="rose" />
+        </div>
+      )}
+    </article>
+  );
+}
+
+function FeatureList({ title, items, tone }: { title: string; items: string[]; tone: 'emerald' | 'sky' | 'rose' }) {
+  const toneClasses = {
+    emerald: 'bg-emerald-50 text-emerald-800',
+    sky: 'bg-sky-50 text-sky-800',
+    rose: 'bg-rose-50 text-rose-800',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl p-3 ${toneClasses}`}>
+      <div className="text-xs font-bold uppercase tracking-wide opacity-75">{title}</div>
+      {items.length > 0 ? (
+        <ul className="mt-2 space-y-1 text-sm">
+          {items.slice(0, 4).map((item) => <li key={item}>• {item}</li>)}
+        </ul>
+      ) : (
+        <div className="mt-2 text-sm opacity-75">None flagged.</div>
+      )}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const utils = trpc.useUtils();
+  const [actionError, setActionError] = useState<string | null>(null);
 
+  const dashboard = trpc.dashboard.get.useQuery(undefined, {
+    enabled: !!user,
+    retry: false,
+  });
+  const runSearch = trpc.search.run.useMutation({
+    onSuccess: async () => {
+      await utils.dashboard.get.invalidate();
+      setActionError(null);
+    },
+    onError: (error) => setActionError(error.message),
+  });
+  const addHotlist = trpc.hotlist.add.useMutation({
+    onSuccess: async () => {
+      await utils.dashboard.get.invalidate();
+      setActionError(null);
+    },
+    onError: (error) => setActionError(error.message),
+  });
 
+  const data = dashboard.data;
+  const hotlistedIds = useMemo(() => new Set((data?.hotlist || []).map((row) => row.hotlist.matchId)), [data?.hotlist]);
+  const briefNeeds = parseJsonList(data?.activeBrief?.needs);
+  const briefWants = parseJsonList(data?.activeBrief?.wants);
+  const briefNns = parseJsonList(data?.activeBrief?.nonNegotiables);
 
-  useEffect(() => {
-    // Inject all global functions that the HTML expects
-    (window as any).addToHotlist = (btn: HTMLElement, cardId: string) => {
-      btn.textContent = '✓ Added';
-      btn.classList.add('added');
-      (btn as HTMLButtonElement).disabled = true;
+  if (loading) {
+    return <div className="min-h-screen bg-slate-50 p-8 text-slate-600">Loading your dashboard…</div>;
+  }
 
-      const addresses: Record<string, any> = {
-        mc1: { addr: '14 Borehole St, Merewether NSW 2291', meta: '4 bed · 2 bath · Double garage + side access', price: '$1,050,000' },
-        mc2: { addr: '7 Cowper St, Merewether NSW 2291', meta: '3 bed · 1 bath · Single garage', price: '$895,000' },
-        mc3: { addr: '31 Pacific St, Bar Beach NSW 2300', meta: '4 bed · 2 bath · Double carport + workshop', price: '$1,099,000' },
-        mc4: { addr: 'Off-market · Merewether area', meta: '4 bed · 2 bath · Details on request', price: 'POA' },
-      };
-      const p = addresses[cardId];
-      const card = document.createElement('div');
-      card.className = 'hotlist-card';
-      card.style.animation = 'fadeUp 0.3s ease';
-      card.innerHTML = `
-        <div class="hotlist-main">
-          <div class="hotlist-addr">${p.addr}</div>
-          <div class="hotlist-meta">${p.meta} <span class="status-pill status-active">JUST ADDED</span></div>
-          <button class="cma-run">Run AI CMA →</button>
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-md rounded-3xl bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-950">Sign in to view your matches</h1>
+          <p className="mt-3 text-slate-600">Your buyer dashboard is protected so your brief, matches, and hotlist remain private.</p>
+          <button className="mt-6 rounded-full bg-slate-950 px-5 py-3 font-semibold text-white" onClick={() => navigate('/login')}>Go to login</button>
         </div>
-        <div class="hotlist-right">
-          <div class="hotlist-price">${p.price}</div>
-          <div class="hotlist-actions" style="flex-direction:column;gap:5px;">
-            <button class="btn-proceed" onclick="openModal('proceed')">Wanna buy this one?</button>
-            <button class="btn-cma" onclick="runCMA(null)">Run full CMA</button>
-            <button class="btn-remove" onclick="this.closest('.hotlist-card').remove()">Remove</button>
-          </div>
-        </div>`;
-      const hotlistCards = document.getElementById('hotlistCards');
-      if (hotlistCards) hotlistCards.prepend(card);
-    };
-
-    (window as any).rejectMatch = (cardId: string) => {
-      const card = document.getElementById(cardId);
-      if (card) {
-        card.classList.add('rejected');
-        setTimeout(() => card.remove(), 350);
-      }
-    };
-
-    (window as any).toggleInspect = (id: string) => {
-      const panel = document.getElementById(id);
-      if (panel) {
-        const btn = panel.previousElementSibling;
-        panel.classList.toggle('open');
-        if (btn) {
-          (btn as HTMLElement).style.color = panel.classList.contains('open') ? 'var(--sky)' : '';
-        }
-      }
-    };
-
-    (window as any).saveNote = (id: string, addr: string, price: string) => {
-      const textEl = document.getElementById(id + '-text') as HTMLTextAreaElement;
-      if (!textEl) return;
-      const text = textEl.value.trim();
-      if (!text) return;
-      const savedText = document.getElementById(id + '-saved-text');
-      if (savedText) savedText.textContent = text;
-      const saved = document.getElementById(id + '-saved');
-      if (saved) saved.classList.add('show');
-      textEl.style.display = 'none';
-      const actions = document.querySelector('#' + id + ' .inspect-actions');
-      if (actions) (actions as HTMLElement).style.display = 'none';
-      const suggestion = (window as any).liamAnalyse(text, price);
-      const suggestText = document.getElementById(id + '-suggest-text');
-      if (suggestText) suggestText.innerHTML = suggestion.text;
-      const suggest = document.getElementById(id + '-suggest');
-      if (suggest) {
-        suggest.classList.add('show');
-        suggest.dataset.price = suggestion.suggestedPrice;
-        suggest.dataset.addr = addr;
-      }
-      const inspBtn = document.getElementById(id)?.previousElementSibling;
-      if (inspBtn) {
-        inspBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 2h8M1 5h6M1 8h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Inspection note saved';
-        (inspBtn as HTMLElement).style.color = 'var(--green)';
-      }
-    };
-
-    (window as any).liamAnalyse = (note: string, askingPrice: string) => {
-      const noteLower = note.toLowerCase();
-      const askNum = parseInt((askingPrice || '0').replace(/[^0-9]/g, '')) || 1000000;
-      let issues: string[] = [];
-      let deductions = 0;
-      if (noteLower.includes('bathroom') || noteLower.includes('bath')) { issues.push('bathroom renovation ($20–30K)'); deductions += 25000; }
-      if (noteLower.includes('kitchen')) { issues.push('kitchen update ($15–25K)'); deductions += 20000; }
-      if (noteLower.includes('roof')) { issues.push('roof work ($8–15K)'); deductions += 12000; }
-      if (noteLower.includes('carpet') || noteLower.includes('floor')) { issues.push('flooring ($6–12K)'); deductions += 8000; }
-      if (noteLower.includes('paint')) { issues.push('painting ($4–8K)'); deductions += 6000; }
-      if (noteLower.includes('noise') || noteLower.includes('loud') || noteLower.includes('traffic')) { issues.push('noise concern (risk factor)'); deductions += 10000; }
-      if (noteLower.includes('damp') || noteLower.includes('mould') || noteLower.includes('rising')) { issues.push('moisture/damp issue ($10–20K)'); deductions += 15000; }
-      const suggestedPrice = askNum - Math.max(deductions, 10000);
-      const suggestedStr = '$' + suggestedPrice.toLocaleString();
-      const deductStr = '$' + deductions.toLocaleString();
-      let text = '';
-      if (issues.length > 0) {
-        text = `Based on your notes, I'm seeing <strong>${issues.join(', ')}</strong> as items to factor in. That's roughly <strong>${deductStr}</strong> in work. <em>My suggestion: go in at <strong>${suggestedStr}</strong> — that covers the work and gives you room to negotiate up if needed.</em>`;
-      } else {
-        const genericDeduct = Math.round(askNum * 0.025 / 1000) * 1000;
-        const genericSuggested = askNum - genericDeduct;
-        text = `Sounds like you liked it. Standard negotiating position would be <strong>$${genericSuggested.toLocaleString()}</strong> — leaves you room to move up to asking if needed without overpaying.`;
-        return { text, suggestedPrice: genericSuggested };
-      }
-      return { text, suggestedPrice };
-    };
-
-    (window as any).editNote = (id: string) => {
-      const saved = document.getElementById(id + '-saved');
-      if (saved) saved.classList.remove('show');
-      const suggest = document.getElementById(id + '-suggest');
-      if (suggest) suggest.classList.remove('show');
-      const textEl = document.getElementById(id + '-text');
-      if (textEl) textEl.style.display = 'block';
-      const actions = document.querySelector('#' + id + ' .inspect-actions');
-      if (actions) (actions as HTMLElement).style.display = 'flex';
-    };
-
-    (window as any).useSuggestion = (id: string) => {
-      const suggestion = document.getElementById(id + '-suggest');
-      if (suggestion) {
-        const price = suggestion.dataset.price || '';
-        const addr = suggestion.dataset.addr || '';
-        (window as any).openModal('proceed', addr, '$' + parseInt(price).toLocaleString(), id);
-      }
-    };
-
-    (window as any).openModal = (type: string, addr?: string, price?: string, inspId?: string) => {
-      const modal = document.getElementById('modalOverlay');
-      if (modal) modal.classList.add('open');
-      if (addr) {
-        const addrEl = document.querySelector('.modal-prop-addr');
-        if (addrEl) addrEl.textContent = addr;
-      }
-      if (price) {
-        const metaEl = document.querySelector('.modal-prop-meta');
-        if (metaEl) metaEl.textContent = (addr ? addr.split(',')[0] : '') + ' · Asking: ' + price;
-      }
-      if (inspId) {
-        const suggest = document.getElementById(inspId + '-suggest');
-        if (suggest && suggest.classList.contains('show') && suggest.dataset.price) {
-          const maxInput = document.querySelector('.modal-input') as HTMLInputElement;
-          if (maxInput) {
-            maxInput.value = '$' + parseInt(suggest.dataset.price).toLocaleString();
-            maxInput.style.borderColor = 'var(--rose)';
-            const existing = document.getElementById('liam-modal-note');
-            if (!existing) {
-              const note = document.createElement('div');
-              note.id = 'liam-modal-note';
-              note.style.cssText = 'font-family:Figtree,sans-serif;font-size:11px;color:var(--rose);margin-top:6px;font-style:italic;';
-              note.textContent = 'Pre-filled from Liam\'s suggestion based on your inspection notes';
-              maxInput.parentNode?.appendChild(note);
-            }
-          }
-        }
-      }
-    };
-
-    (window as any).closeModal = () => {
-      const modal = document.getElementById('modalOverlay');
-      if (modal) modal.classList.remove('open');
-    };
-
-    (window as any).submitProceed = () => {
-      (window as any).closeModal();
-      const toast = document.createElement('div');
-      toast.style.cssText = `position:fixed;bottom:28px;right:28px;z-index:300;
-        background:#2A2A2A;border:1px solid rgba(232,180,184,0.3);border-radius:10px;
-        padding:14px 20px;font-family:'Figtree',sans-serif;font-size:13px;color:#F4F1EC;
-        box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:fadeUp 0.3s ease;`;
-      toast.innerHTML = `<strong style="color:#E8B4B8;">Request received.</strong><br>
-        <span style="color:#7FA8D4;font-size:11px;">Liam's team will be in touch within one business day.</span>`;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
-    };
-
-    const cmaSteps = [
-      { msg: 'Checking property.com.au...', sub: 'Retrieving listing date and property history', step: 1, pct: 10 },
-      { msg: 'Found listing timeline.', sub: 'Days on market and past sale history confirmed', step: 1, pct: 20 },
-      { msg: 'Searching for comparable sales...', sub: 'Checking state portal — REIWA, Domain or REA depending on location', step: 2, pct: 32 },
-      { msg: 'Scanning settled transactions...', sub: 'Filtering last 12 months · same property type · within 3km', step: 2, pct: 44 },
-      { msg: 'Verifying comparables...', sub: 'Excluding asking prices and AVM estimates — settled sales only', step: 3, pct: 58 },
-      { msg: 'Comps verified.', sub: 'Calculating median sale price and average $/m²', step: 4, pct: 72 },
-      { msg: 'Building valuation range...', sub: 'Adjusting for land size, market trend and vendor discounting', step: 4, pct: 84 },
-      { msg: 'Running self-review...', sub: 'Confirming data quality and no fabricated sales', step: 5, pct: 94 },
-      { msg: 'Liam is writing his assessment.', sub: 'Almost ready...', step: 5, pct: 99 },
-    ];
-
-    (window as any).runCMA = (cmaUrl: string | null) => {
-      const overlay = document.getElementById('cmaOverlay');
-      if (!overlay) return;
-      overlay.classList.add('show');
-
-      let stepIdx = 0;
-      const fill = document.getElementById('cmaProgressFill');
-      const msgEl = document.getElementById('cmaLoadingMsg');
-      const subEl = document.getElementById('cmaLoadingSub');
-
-      for (let i = 1; i <= 5; i++) {
-        const el = document.getElementById('cmaStep' + i);
-        if (el) {
-          el.classList.remove('active', 'done');
-        }
-      }
-      const step1 = document.getElementById('cmaStep1');
-      if (step1) step1.classList.add('active');
-      if (fill) fill.style.width = '8%';
-
-      const interval = setInterval(() => {
-        if (stepIdx >= cmaSteps.length) {
-          clearInterval(interval);
-          setTimeout(() => {
-            overlay.classList.remove('show');
-            if (cmaUrl) window.open(cmaUrl, '_blank');
-          }, 400);
-          return;
-        }
-
-        const s = cmaSteps[stepIdx];
-
-        if (msgEl && subEl) {
-          msgEl.style.opacity = '0';
-          subEl.style.opacity = '0';
-          setTimeout(() => {
-            msgEl.textContent = s.msg;
-            subEl.textContent = s.sub;
-            msgEl.style.opacity = '1';
-            subEl.style.opacity = '1';
-          }, 150);
-        }
-
-        if (fill) fill.style.width = s.pct + '%';
-
-        for (let i = 1; i <= 5; i++) {
-          const el = document.getElementById('cmaStep' + i);
-          if (el) {
-            el.classList.remove('active', 'done');
-            if (i < s.step) el.classList.add('done');
-            else if (i === s.step) el.classList.add('active');
-          }
-        }
-
-        stepIdx++;
-      }, 2800);
-    };
-
-    (window as any).openEditBrief = () => {
-      const overlay = document.getElementById('editBriefOverlay');
-      if (overlay) {
-        overlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
-      }
-    };
-
-    (window as any).closeEditBrief = () => {
-      const overlay = document.getElementById('editBriefOverlay');
-      if (overlay) {
-        overlay.classList.remove('open');
-        document.body.style.overflow = '';
-      }
-    };
-
-    (window as any).saveBrief = () => {
-      const staleCount = 1;
-      const msg = document.getElementById('briefUpdatedText');
-      if (msg) {
-        if (staleCount > 0) {
-          msg.innerHTML = `You updated your brief. <em>${staleCount} propert${staleCount > 1 ? 'ies' : 'y'} on your hotlist no longer match${staleCount === 1 ? 'es' : ''} your new criteria — I've flagged ${staleCount === 1 ? 'it' : 'them'} below. Still on your list until you remove ${staleCount === 1 ? 'it' : 'them'}.</em>`;
-        } else {
-          msg.innerHTML = 'Your brief has been updated. <em>All hotlisted properties still match your new criteria.</em>';
-        }
-      }
-      const briefUpdated = document.getElementById('briefUpdatedMsg');
-      if (briefUpdated) briefUpdated.classList.add('show');
-      (window as any).closeEditBrief();
-
-      setTimeout(() => {
-        const hotlist = document.querySelector('.hotlist-cards');
-        if (hotlist) hotlist.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 300);
-    };
-
-    (window as any).removeEditTag = (btn: HTMLElement) => {
-      btn.parentElement?.remove();
-    };
-
-    (window as any).setupEditTagInput = (inputId: string, wrapId: string) => {
-      const input = document.getElementById(inputId) as HTMLInputElement;
-      if (!input) return;
-      input.addEventListener('keydown', function(e: KeyboardEvent) {
-        if (e.key === 'Enter' || e.key === ',') {
-          e.preventDefault();
-          const val = this.value.trim().replace(/,$/, '');
-          if (!val) return;
-          const wrap = document.getElementById(wrapId);
-          if (!wrap) return;
-          const classMap: Record<string, string> = {
-            'edit-nn-wrap': 'tag-nn',
-            'edit-need-wrap': 'tag-need',
-            'edit-want-wrap': 'tag-want',
-          };
-          const cls = classMap[wrapId] || 'tag-need';
-          const tag = document.createElement('span');
-          tag.className = 'tag-item ' + cls;
-          tag.innerHTML = val + '<button class="tag-remove" onclick="removeEditTag(this)" type="button">×</button>';
-          wrap.insertBefore(tag, input);
-          this.value = '';
-        }
-        if (e.key === 'Backspace' && !this.value) {
-          const wrap = document.getElementById(wrapId);
-          if (wrap) {
-            const tags = wrap.querySelectorAll('.tag-item');
-            if (tags.length) tags[tags.length - 1].remove();
-          }
-        }
-      });
-    };
-
-    (window as any).saveAccountDetails = (event?: Event) => {
-      const btn = event?.target ? (event.target as HTMLButtonElement) : document.querySelector('.btn-save-account') as HTMLButtonElement;
-      if (!btn) return;
-      btn.textContent = 'Saved ✓';
-      btn.style.background = 'var(--green)';
-      setTimeout(() => {
-        btn.textContent = 'Save changes';
-        btn.style.background = '';
-      }, 2000);
-    };
-
-    (window as any).saveNotifPref = (key: string, value: any) => {
-      console.log('Notif pref:', key, value);
-    };
-
-    (window as any).showCancelConfirm = () => {
-      const confirm = document.getElementById('cancelConfirm');
-      if (confirm) confirm.classList.add('show');
-    };
-
-    (window as any).hideCancelConfirm = () => {
-      const confirm = document.getElementById('cancelConfirm');
-      if (confirm) confirm.classList.remove('show');
-    };
-
-    (window as any).confirmCancel = () => {
-      const confirm = document.getElementById('cancelConfirm');
-      if (confirm) {
-        confirm.innerHTML = `
-          <div class="cancel-confirm-text" style="color:var(--steel);">
-            Done. Liam runs your last search on <strong style="color:var(--offwhite);">29 June 2026</strong>.
-            Your account stays open — everything is still here when you come back.
-          </div>
-          <div style="margin-top:12px;">
-            <button class="btn-save-brief" onclick="resumeSubscription()" style="font-size:12px;padding:9px 18px;">
-              Actually — keep my subscription
-            </button>
-          </div>`;
-      }
-    };
-
-    (window as any).resumeSubscription = () => {
-      const confirm = document.getElementById('cancelConfirm');
-      if (confirm) confirm.classList.remove('show');
-      const btn = document.querySelector('.btn-cancel-sub') as HTMLButtonElement;
-      if (btn) {
-        btn.textContent = 'Subscription active ✓';
-        btn.style.color = 'var(--green)';
-        btn.style.borderColor = 'rgba(76,175,125,0.3)';
-        btn.disabled = true;
-        setTimeout(() => {
-          btn.textContent = 'Cancel my subscription';
-          btn.style.color = '';
-          btn.style.borderColor = '';
-          btn.disabled = false;
-        }, 2000);
-      }
-    };
-
-    // Setup edit modal tag inputs
-    (window as any).setupEditTagInput('edit-nn-input', 'edit-nn-wrap');
-    (window as any).setupEditTagInput('edit-need-input', 'edit-need-wrap');
-    (window as any).setupEditTagInput('edit-want-input', 'edit-want-wrap');
-
-    // Close edit modal on overlay click
-    const editOverlay = document.getElementById('editBriefOverlay');
-    if (editOverlay) {
-      editOverlay.addEventListener('click', function(e: Event) {
-        if (e.target === this) (window as any).closeEditBrief();
-      });
-    }
-  }, []);
+      </div>
+    );
+  }
 
   return (
-    <div dangerouslySetInnerHTML={{ __html: dashboardHTML }} />
+    <main className="min-h-screen bg-[#f7f4ef] px-4 py-6 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-6 flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300">BuyersBrief Dashboard</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">Welcome back{user.firstName ? `, ${user.firstName}` : ''}</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              This dashboard now reflects your saved buyer brief, AI-generated property matches, and live hotlist state from the backend.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10" onClick={() => navigate('/brief')}>Edit / create brief</button>
+            <button
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={runSearch.isPending || !data?.activeBrief}
+              onClick={() => data?.activeBrief && runSearch.mutate({ briefId: data.activeBrief.id })}
+            >
+              {runSearch.isPending ? 'Refreshing matches…' : 'Run AI search'}
+            </button>
+          </div>
+        </header>
+
+        {(dashboard.error || actionError) && (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+            {actionError || dashboard.error?.message}
+          </div>
+        )}
+
+        <section className="mb-6 grid gap-4 md:grid-cols-4">
+          <Metric label="Active brief" value={data?.activeBrief ? 'Saved' : 'None'} />
+          <Metric label="AI matches" value={String(data?.matches?.length || 0)} />
+          <Metric label="Hotlist" value={String(data?.hotlist?.length || 0)} />
+          <Metric label="Tier" value={user.tier || 'free'} />
+        </section>
+
+        <section className="mb-6 grid gap-5 lg:grid-cols-[1fr_360px]">
+          <div className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Current buyer brief</h2>
+                <p className="text-sm text-slate-500">The backend record Liam is matching against.</p>
+              </div>
+              {data?.activeBrief && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{data.activeBrief.status}</span>}
+            </div>
+            {data?.activeBrief ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <BriefLine label="Location" value={data.activeBrief.suburbs || 'Not specified'} />
+                <BriefLine label="Property" value={[data.activeBrief.type, data.activeBrief.beds ? `${data.activeBrief.beds} bed` : null, data.activeBrief.baths ? `${data.activeBrief.baths} bath` : null].filter(Boolean).join(' · ') || 'Not specified'} />
+                <BriefLine label="Budget" value={data.activeBrief.budgetDisplay || money(data.activeBrief.budget, 'Not specified')} />
+                <BriefLine label="Timeline" value={data.activeBrief.timeline || 'Not specified'} />
+                <BriefTagGroup title="Non-negotiables" items={briefNns} />
+                <BriefTagGroup title="Needs" items={briefNeeds} />
+                <BriefTagGroup title="Wants" items={briefWants} />
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+                No saved buyer brief yet. Create one to unlock AI-generated matches.
+              </div>
+            )}
+          </div>
+
+          <aside className="rounded-3xl bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">Hotlist</h2>
+            <p className="mt-1 text-sm text-slate-500">Properties you have shortlisted for deeper review.</p>
+            <div className="mt-4 space-y-3">
+              {(data?.hotlist || []).length > 0 ? data?.hotlist.map((row) => (
+                <div key={row.hotlist.id} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="font-semibold text-slate-950">{row.match?.address || `Match #${row.hotlist.matchId}`}</div>
+                  <div className="mt-1 text-sm text-slate-500">{row.match?.priceDisplay || money(row.match?.price)}</div>
+                </div>
+              )) : (
+                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">No hotlisted properties yet.</div>
+              )}
+            </div>
+          </aside>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-950">Liam’s matches</h2>
+              <p className="text-sm text-slate-600">Ranked by how closely each property fits the saved brief.</p>
+            </div>
+          </div>
+
+          {dashboard.isPending ? (
+            <div className="rounded-3xl bg-white p-8 text-slate-600 shadow-sm">Loading live matches…</div>
+          ) : (data?.matches || []).length > 0 ? (
+            data?.matches.map((match) => (
+              <MatchCardView
+                key={match.id}
+                match={match as MatchCard}
+                isHotlisted={hotlistedIds.has(match.id)}
+                hotlisting={addHotlist.isPending && addHotlist.variables?.matchId === match.id}
+                onHotlist={() => addHotlist.mutate({ matchId: match.id })}
+              />
+            ))
+          ) : (
+            <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
+              <h3 className="text-xl font-bold text-slate-950">No matches yet</h3>
+              <p className="mx-auto mt-2 max-w-xl text-slate-600">Create a buyer brief, then run the AI search to generate the first match set into your dashboard.</p>
+              <button className="mt-5 rounded-full bg-slate-950 px-5 py-3 font-semibold text-white" onClick={() => navigate('/brief')}>Create buyer brief</button>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-3xl bg-white p-5 shadow-sm">
+      <div className="text-sm font-semibold text-slate-500">{label}</div>
+      <div className="mt-2 text-2xl font-bold text-slate-950">{value}</div>
+    </div>
+  );
+}
+
+function BriefLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mt-1 font-semibold text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function BriefTagGroup({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4 md:col-span-2">
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {items.length > 0 ? items.map((item) => (
+          <span key={item} className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700">{item}</span>
+        )) : <span className="text-sm text-slate-500">Not specified</span>}
+      </div>
+    </div>
   );
 }

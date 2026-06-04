@@ -15,6 +15,13 @@
       "when": 1780055318470,
       "tag": "0001_giant_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780564873041,
+      "tag": "0002_gorgeous_sister_grimm",
+      "breakpoints": true
     }
   ]
 }
