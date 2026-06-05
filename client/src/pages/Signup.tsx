@@ -31,7 +31,7 @@ type SignupFormData = {
 };
 
 const getStoredBrief = (): StoredBriefData | null => {
-  const raw = sessionStorage.getItem('briefData');
+  const raw = sessionStorage.getItem('briefData') || sessionStorage.getItem('briefBasics');
   if (!raw) return null;
 
   try {
@@ -39,6 +39,138 @@ const getStoredBrief = (): StoredBriefData | null => {
   } catch {
     return null;
   }
+};
+
+const hasUsableBrief = (brief: StoredBriefData | null): brief is StoredBriefData => {
+  if (!brief) return false;
+  return Boolean(
+    brief.suburb?.trim() ||
+    brief.budget?.trim() ||
+    brief.budgetCeiling?.trim() ||
+    brief.beds?.trim() ||
+    brief.propertyType?.trim() ||
+    (brief.nonNegotiables?.length ?? 0) > 0 ||
+    (brief.needs?.length ?? 0) > 0 ||
+    (brief.wants?.length ?? 0) > 0
+  );
+};
+
+const escapeHtml = (value: string): string => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+const titleCase = (value?: string): string => {
+  if (!value) return '';
+  return value
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const compactList = (items: Array<string | undefined | null>): string => items
+  .map((item) => item?.trim())
+  .filter(Boolean)
+  .join(' · ');
+
+const summarizeBrief = (brief: StoredBriefData): string => {
+  const area = brief.suburb?.trim() || 'your selected area';
+  const beds = brief.beds ? `${brief.beds}+ bed` : '';
+  const type = titleCase(brief.propertyType) || 'property';
+  const budget = brief.budgetCeiling || brief.budget || '';
+  return compactList([area, beds, type, budget ? `to ${budget}` : '']);
+};
+
+const featureSummary = (brief: StoredBriefData): string => {
+  const features = [
+    ...(brief.nonNegotiables ?? []),
+    ...(brief.needs ?? []),
+    ...(brief.wants ?? []),
+  ].map((item) => item.trim()).filter(Boolean);
+  return features.length > 0 ? features.slice(0, 3).join(', ') : 'needs, wants, and watch-outs from your saved brief';
+};
+
+const hydrateSignupPreview = (navigate: (path: string) => void) => {
+  const brief = getStoredBrief();
+  const stepSub = document.querySelector<HTMLElement>('#step1 .step-left > .step-sub');
+  const liamText = document.querySelector<HTMLElement>('#step1 .liam-text');
+  const headerText = document.querySelector<HTMLElement>('#step1 .results-header-text');
+  const headerSub = document.querySelector<HTMLElement>('#step1 .results-header-sub');
+  const resultsCount = document.querySelector<HTMLElement>('#step1 .results-count');
+  const resultsItems = document.querySelector<HTMLElement>('#step1 .results-items');
+  const footerText = document.querySelector<HTMLElement>('#step1 .results-footer-text');
+  const cta = document.querySelector<HTMLButtonElement>('#step1 .step-right button.btn-primary');
+  const ctaNote = document.querySelector<HTMLElement>('#step1 .btn-note');
+
+  if (!hasUsableBrief(brief)) {
+    if (stepSub) stepSub.textContent = 'There is no saved buyer brief in this browser session yet. Create a brief first so Liam can run a real AI match search against your own criteria.';
+    if (liamText) liamText.textContent = 'I won’t show sample properties here. Build your brief first, then I’ll save it to your account and run the real AI search for your dashboard.';
+    if (headerText) headerText.textContent = 'No saved brief yet';
+    if (headerSub) headerSub.textContent = 'Create a brief to start a real search';
+    if (resultsCount) resultsCount.textContent = '0 found';
+    if (resultsItems) {
+      resultsItems.innerHTML = `
+        <div class="results-item">
+          <div class="results-item-rank">→</div>
+          <div class="results-item-addr">Create your buyer brief to unlock real AI matches</div>
+          <div class="results-item-badge">NO SAMPLE DATA</div>
+          <div class="results-item-price">Pending</div>
+        </div>
+      `;
+    }
+    if (footerText) footerText.textContent = 'Sample properties have been removed. Your results will be generated from your own saved brief.';
+    if (cta) {
+      cta.textContent = 'Create my buyer brief';
+      cta.onclick = () => navigate('/brief');
+    }
+    if (ctaNote) ctaNote.textContent = 'Takes 3 minutes · no demo properties shown';
+    return;
+  }
+
+  const summary = summarizeBrief(brief);
+  const escapedSummary = escapeHtml(summary);
+  const escapedFeatures = escapeHtml(featureSummary(brief));
+  const budget = escapeHtml(brief.budgetCeiling || brief.budget || 'Budget to be confirmed');
+  const typeAndBeds = escapeHtml(compactList([brief.beds ? `${brief.beds}+ bed` : '', titleCase(brief.propertyType) || 'Property']) || 'Property criteria saved');
+
+  if (stepSub) {
+    stepSub.innerHTML = `Based on your saved brief — <strong>${escapedSummary}</strong> — Liam will run the real AI search after your account is created and send the saved matches to your dashboard.`;
+  }
+  if (liamText) {
+    liamText.textContent = 'I have your brief saved. Create your account and I’ll run the AI search against this exact brief, then send you to your dashboard with the real saved matches.';
+  }
+  if (headerText) headerText.textContent = `Your brief · ${summary}`;
+  if (headerSub) headerSub.textContent = 'Ready for live AI search after signup';
+  if (resultsCount) resultsCount.textContent = 'Ready';
+  if (resultsItems) {
+    resultsItems.innerHTML = `
+      <div class="results-item">
+        <div class="results-item-rank">#1</div>
+        <div class="results-item-addr">Search area: ${escapeHtml(brief.suburb || 'Saved area')}</div>
+        <div class="results-item-badge">BRIEF READY</div>
+        <div class="results-item-price">${budget}</div>
+      </div>
+      <div class="results-item">
+        <div class="results-item-rank">#2</div>
+        <div class="results-item-addr">Hard filters: ${escapedFeatures}</div>
+        <div class="results-item-badge" style="background:rgba(76,175,125,0.12);color:var(--green);">CRITERIA</div>
+        <div class="results-item-price">${typeAndBeds}</div>
+      </div>
+      <div class="results-item">
+        <div class="results-item-rank">#3</div>
+        <div class="results-item-addr">Dashboard matches will be generated and saved after signup</div>
+        <div class="results-item-badge">AI SEARCH</div>
+        <div class="results-item-price">Pending</div>
+      </div>
+    `;
+  }
+  if (footerText) footerText.textContent = 'No sample properties shown. Your dashboard will populate from the live AI search after account creation.';
+  if (cta) {
+    cta.innerHTML = 'Activate my brief <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    cta.onclick = () => (window as any).goStep(2);
+  }
+  if (ctaNote) ctaNote.textContent = 'Takes 2 minutes · real search runs after signup';
 };
 
 const normalizeIntent = (intent?: string): 'live' | 'invest' | 'both' => {
@@ -113,8 +245,8 @@ export default function Signup() {
 
   const replayStoredBrief = async () => {
     const briefData = getStoredBrief();
-    if (!briefData) {
-      navigate('/dashboard');
+    if (!hasUsableBrief(briefData)) {
+      navigate('/brief');
       return;
     }
 
@@ -160,6 +292,8 @@ export default function Signup() {
   }, [user]);
 
   useEffect(() => {
+    hydrateSignupPreview(navigate);
+
     const showStep = (n: number) => {
       document.querySelectorAll('.step-page').forEach(p => p.classList.remove('active'));
 
@@ -262,7 +396,7 @@ export default function Signup() {
 
     (window as any).currentStep = 1;
     (window as any).selectedPathType = null;
-  }, [signup, utils]);
+  }, [signup, utils, navigate]);
 
   return (
     <div dangerouslySetInnerHTML={{ __html: signupHTML }} />

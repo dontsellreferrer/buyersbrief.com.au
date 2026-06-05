@@ -312,7 +312,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const responseFormat = normalizeResponseFormat(params);
 
   if (process.env.ANTHROPIC_API_KEY) {
-    return invokeAnthropic(params, responseFormat);
+    try {
+      return await invokeAnthropic(params, responseFormat);
+    } catch (error) {
+      if (!process.env.OPENAI_API_KEY) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[LLM] Anthropic invoke failed; falling back to OpenAI: ${message}`);
+      return invokeOpenAI(params, responseFormat);
+    }
   }
 
   if (process.env.OPENAI_API_KEY) {
