@@ -186,6 +186,7 @@ export const cmas = pgTable("cmas", {
   addressSlug: text("address_slug").notNull(),
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
   cmaData: jsonb("cma_data").$type<Record<string, unknown>>().notNull(),
+  renderedHtml: text("rendered_html"),
   confidence: cmaConfidenceEnum("confidence").default("medium").notNull(),
 });
 

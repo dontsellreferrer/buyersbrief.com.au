@@ -476,7 +476,8 @@ export default function Signup() {
         if (!user) {
           const form = extractSignupForm();
           setSignupBusy(true, 'Creating account…');
-          await signup.mutateAsync(form);
+          const signupResult = await signup.mutateAsync(form);
+          utils.auth.me.setData(undefined, signupResult.user as any);
           await utils.auth.me.invalidate();
         }
 

@@ -13,8 +13,10 @@ import {
   createUser,
   getBriefById,
   getBriefsByUserId,
+  getCmaByHotlistId,
   getCmaBySlug,
   getHotlistByUserId,
+  getHotlistEntryWithMatch,
   getLatestBriefByUserId,
   getMatchById,
   getMatchesByBriefId,
@@ -26,6 +28,7 @@ import {
   updateUserNotificationPrefs,
   updateUserTier,
 } from "./db";
+import { generateCmaForMatch } from "./services/cma";
 import { generateAISearchMatchesForBrief, runAISearchForBrief, saveAISearchMatchesForBrief, type AISearchMatchPayload } from "./services/search";
 import type { Brief } from "../drizzle/schema";
 
@@ -241,8 +244,13 @@ export const appRouter = router({
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
+            mobile: user.mobile,
             role: user.role,
             tier: user.tier,
+            notifications: user.notifications,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            lastSignedIn: user.lastSignedIn,
           },
         };
       }),
@@ -281,8 +289,13 @@ export const appRouter = router({
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
+            mobile: user.mobile,
             role: user.role,
             tier: user.tier,
+            notifications: user.notifications,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            lastSignedIn: user.lastSignedIn,
           },
         };
       }),
@@ -414,6 +427,23 @@ export const appRouter = router({
       }),
   }),
 
+  user: router({
+    updateNotifications: protectedProcedure
+      .input(z.object({
+        dailyEmail: z.boolean().optional(),
+        hotSms: z.boolean().optional(),
+        priceDrop: z.boolean().optional(),
+        statusChange: z.boolean().optional(),
+        weeklyDigest: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const updated = await updateUserNotificationPrefs(user.id, input);
+        if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update notification preferences" });
+        return { success: true, notifications: updated.notifications };
+      }),
+  }),
+
   dashboard: router({
     get: protectedProcedure.query(async ({ ctx }) => {
       const user = ensureCurrentUser(ctx);
@@ -489,24 +519,38 @@ export const appRouter = router({
 
   cma: router({
     generate: protectedProcedure
-      .input(z.object({ hotlistId: z.number().int().positive(), address: z.string().min(1), suburb: z.string().optional() }))
-      .mutation(async ({ input }) => {
-        const addressSlug = slugify(input.address);
-        const suburbSlug = slugify(input.suburb || input.address.split(",").slice(-2, -1)[0] || "property");
+      .input(z.object({ hotlistId: z.number().int().positive(), address: z.string().min(1).optional(), suburb: z.string().optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const existing = await getCmaByHotlistId(input.hotlistId, user.id);
+        if (existing) {
+          return { success: true, cma: existing, url: `/cma/${existing.suburbSlug}/${existing.addressSlug}`, cached: true };
+        }
+
+        const ownedHotlist = await getHotlistEntryWithMatch(input.hotlistId, user.id);
+        if (!ownedHotlist) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Hotlisted property not found" });
+        }
+        if (!ownedHotlist.match) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Matched property not found for this hotlist entry" });
+        }
+
+        const address = input.address?.trim() || ownedHotlist.match.address;
+        const suburb = input.suburb?.trim() || ownedHotlist.match.suburb || address.split(",").slice(-2, -1)[0] || "property";
+        const addressSlug = slugify(address);
+        const suburbSlug = slugify(suburb);
+        const generated = await generateCmaForMatch(ownedHotlist.match, address);
         const cma = await createCma({
           hotlistId: input.hotlistId,
-          address: input.address,
+          address,
           suburbSlug,
           addressSlug,
-          confidence: "medium",
-          cmaData: {
-            address: input.address,
-            summary: "Initial CMA placeholder generated from the hotlisted property context. Full comparable-sales enrichment can be attached to this record as provider integrations are added.",
-            generatedBy: "buyersbrief-direct-backend",
-          },
+          confidence: generated.confidence,
+          cmaData: generated.cmaData,
+          renderedHtml: generated.renderedHtml,
         });
         if (!cma) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to generate CMA" });
-        return { success: true, cma, url: `/cma/${suburbSlug}/${addressSlug}` };
+        return { success: true, cma, url: `/cma/${suburbSlug}/${addressSlug}`, cached: false };
       }),
 
     bySlug: publicProcedure

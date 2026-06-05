@@ -1,325 +1,138 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { trpc } from '@/lib/trpc';
 
+type TabId = 'matches' | 'hotlist' | 'brief' | 'account';
+type PurchaseIntent = 'live' | 'invest' | 'both';
+type NotificationKey = 'dailyEmail' | 'hotSms' | 'priceDrop' | 'statusChange' | 'weeklyDigest';
+
 type MatchCard = {
-  id: number;
-  address: string;
-  suburb: string | null;
-  state: string | null;
-  postcode: string | null;
-  propertyType: string | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  parking: string | null;
-  priceDisplay: string | null;
-  price: number | null;
-  score: number;
-  daysOnMarket: number | null;
-  listingStatus: string | null;
-  listingUrl: string | null;
-  liamNote: string | null;
-  scoreBreakdown: unknown;
+  id: number; address: string; suburb: string | null; state: string | null; postcode: string | null;
+  propertyType: string | null; bedrooms: number | null; bathrooms: number | null; parking: string | null;
+  landSizeM2?: number | null; priceDisplay: string | null; price: number | null; score: number;
+  daysOnMarket: number | null; listingStatus: string | null; listingUrl: string | null; liamNote: string | null;
+  scoreBreakdown: unknown; status?: string | null;
 };
 
-function money(value: number | null | undefined, fallback = 'POA') {
-  if (!value) return fallback;
-  return `$${value.toLocaleString('en-AU')}`;
+type CmaArchive = { id: number; suburbSlug: string; addressSlug: string; generatedAt?: unknown; confidence?: string | null };
+
+type HotlistRow = {
+  hotlist: { id: number; matchId: number; cmaId?: number | null; status: string; staleReason?: string | null; inspectionNote?: string | null; liamSuggestion?: string | null; suggestedPrice?: number | null; lastPrice?: number | null; addedAt?: unknown };
+  match: MatchCard | null;
+  cma?: CmaArchive | null;
+};
+
+type EditBriefForm = {
+  suburbs: string; type: string; beds: string; baths: string; parking: string; budgetDisplay: string;
+  purchaseIntent: PurchaseIntent; flex: string; nonNegotiables: string; needs: string; wants: string;
+  niceToHaves: string; story: string; finance: string; timeline: string;
+};
+
+const defaultNotifications: Record<NotificationKey, boolean> = { dailyEmail: true, hotSms: false, priceDrop: true, statusChange: true, weeklyDigest: true };
+const emptyBriefForm: EditBriefForm = { suburbs: '', type: '', beds: '', baths: '', parking: '', budgetDisplay: '', purchaseIntent: 'live', flex: '', nonNegotiables: '', needs: '', wants: '', niceToHaves: '', story: '', finance: '', timeline: '' };
+
+function money(value: number | null | undefined, fallback = 'POA') { return value ? `$${value.toLocaleString('en-AU')}` : fallback; }
+function statusLabel(status: string | null | undefined) { return status ? status.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()) : 'Active'; }
+function parseJsonList(value: string | null | undefined): string[] { if (!value) return []; try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) return parsed.map(String).map((x) => x.trim()).filter(Boolean); } catch {} return value.split(/[,\n]/).map((x) => x.trim()).filter(Boolean); }
+function displayList(value: string | null | undefined, fallback = 'Not specified') { const list = parseJsonList(value); return list.length ? list.join(', ') : (value?.trim() || fallback); }
+function asList(value: unknown, key: string): string[] { if (!value || typeof value !== 'object') return []; const v = (value as Record<string, unknown>)[key]; return Array.isArray(v) ? v.map(String).filter(Boolean) : []; }
+function asText(value: unknown, key: string): string | null { if (!value || typeof value !== 'object') return null; const v = (value as Record<string, unknown>)[key]; return typeof v === 'string' ? v : null; }
+function formatDate(value: unknown) { if (!value) return 'Not recorded'; const d = value instanceof Date ? value : new Date(String(value)); return Number.isNaN(d.getTime()) ? 'Not recorded' : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function propertyMeta(match: Partial<MatchCard> | null | undefined) { if (!match) return 'Property details pending'; return [typeof match.bedrooms === 'number' ? `${match.bedrooms} bed` : null, typeof match.bathrooms === 'number' ? `${match.bathrooms} bath` : null, match.parking ? `${match.parking} parking` : null, match.propertyType, match.landSizeM2 ? `${match.landSizeM2.toLocaleString('en-AU')} m² land` : null].filter(Boolean).join(' · ') || 'Property details pending'; }
+function addressLine(match: Partial<MatchCard> | null | undefined) { return match ? [match.suburb, match.state, match.postcode].filter(Boolean).join(' ') : ''; }
+function initials(firstName?: string | null, lastName?: string | null, email?: string | null) { return `${firstName?.trim()?.[0] || ''}${lastName?.trim()?.[0] || ''}`.toUpperCase() || (email?.trim()?.[0] || 'B').toUpperCase(); }
+function tierLabel(tier: string | null | undefined) { return ({ free: 'Free', tier1: 'Tier 1', tier2: 'Tier 2', tier3: 'Tier 3 Concierge' } as Record<string, string>)[tier || 'free'] || statusLabel(tier); }
+function normalizeIntent(value: unknown): PurchaseIntent { return value === 'invest' || value === 'both' || value === 'live' ? value : 'live'; }
+function hasStoredBriefForSignup(): boolean { if (typeof window === 'undefined') return false; try { return Boolean(window.sessionStorage.getItem('briefData') || window.sessionStorage.getItem('briefBasics')); } catch { return false; } }
+function formFromBrief(brief: any): EditBriefForm { if (!brief) return emptyBriefForm; return { suburbs: displayList(brief.suburbs, ''), type: brief.type || '', beds: brief.beds || '', baths: brief.baths || '', parking: brief.parking || '', budgetDisplay: brief.budgetDisplay || money(brief.budget, ''), purchaseIntent: normalizeIntent(brief.purchaseIntent), flex: brief.flex || '', nonNegotiables: displayList(brief.nonNegotiables, ''), needs: displayList(brief.needs, ''), wants: displayList(brief.wants, ''), niceToHaves: displayList(brief.niceToHaves, ''), story: brief.story || '', finance: brief.financeStatus || brief.finance || '', timeline: brief.timeline || '' }; }
+
+function BBIcon({ size = 24, inverted = false }: { size?: number; inverted?: boolean }) {
+  return <span className={`bbi ${inverted ? 'bbi-inv' : ''}`} style={{ width: size, height: size * 1.2 }} aria-hidden="true"><span className="doc"/><span className="fold"/><span className="dls"><span/><span/><span/><span/></span></span>;
 }
 
-function asList(value: unknown, key: string): string[] {
-  if (!value || typeof value !== 'object') return [];
-  const candidate = (value as Record<string, unknown>)[key];
-  return Array.isArray(candidate) ? candidate.map(String).filter(Boolean) : [];
+function EmptyState({ title, children, action }: { title: string; children: string; action?: React.ReactNode }) {
+  return <div className="empty-state"><BBIcon size={34}/><h3>{title}</h3><p>{children}</p>{action}</div>;
 }
 
-function parseJsonList(value: string | null | undefined): string[] {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
-  } catch {
-    // Stored free text is also valid brief context.
-  }
-  return value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+function ScoreRing({ score }: { score: number }) {
+  const value = Math.max(0, Math.min(100, Number.isFinite(score) ? score : 0));
+  return <div className={`score-ring ${value >= 80 ? 'high' : value >= 60 ? 'med' : 'low'}`}><span>{value}</span></div>;
 }
 
-function statusLabel(status: string | null | undefined) {
-  if (!status) return 'Active';
-  return status.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
-}
-
-function MatchCardView({
-  match,
-  isHotlisted,
-  onHotlist,
-  hotlisting,
-}: {
-  match: MatchCard;
-  isHotlisted: boolean;
-  onHotlist: () => void;
-  hotlisting: boolean;
-}) {
+function DashboardMatchCard({ match, index, isHotlisted, hotlistRow, adding, cmaGenerating, onAdd, onViewCma, onRunCma }: { match: MatchCard; index: number; isHotlisted: boolean; hotlistRow?: HotlistRow; adding: boolean; cmaGenerating: boolean; onAdd: () => void; onViewCma: () => void; onRunCma: () => void }) {
   const needsMet = asList(match.scoreBreakdown, 'needsMet');
   const wantsMet = asList(match.scoreBreakdown, 'wantsMet');
   const flags = asList(match.scoreBreakdown, 'nnFlags');
-
-  return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">{statusLabel(match.listingStatus)}</span>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{match.score}% match</span>
-            {typeof match.daysOnMarket === 'number' && (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{match.daysOnMarket} days listed</span>
-            )}
-          </div>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-950">{match.address}</h2>
-          <p className="mt-1 text-sm text-slate-500">{[match.suburb, match.state, match.postcode].filter(Boolean).join(' ')}</p>
-          <p className="mt-3 text-sm text-slate-700">
-            {[match.bedrooms ? `${match.bedrooms} bed` : null, match.bathrooms ? `${match.bathrooms} bath` : null, match.parking ? `${match.parking} parking` : null, match.propertyType].filter(Boolean).join(' · ')}
-          </p>
-        </div>
-        <div className="min-w-[180px] text-left lg:text-right">
-          <div className="text-2xl font-bold text-slate-950">{match.priceDisplay || money(match.price)}</div>
-          <div className="mt-3 flex flex-wrap gap-2 lg:justify-end">
-            {match.listingUrl && (
-              <a className="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-sky-400 hover:text-sky-700" href={match.listingUrl} target="_blank" rel="noreferrer">View listing</a>
-            )}
-            <button
-              className="rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-              onClick={onHotlist}
-              disabled={isHotlisted || hotlisting}
-            >
-              {isHotlisted ? 'Hotlisted' : hotlisting ? 'Adding…' : 'Add to hotlist'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-        <strong className="text-slate-950">Liam’s note:</strong> {match.liamNote || 'This property has been matched against your saved buyer brief.'}
-      </div>
-
-      {(needsMet.length > 0 || wantsMet.length > 0 || flags.length > 0) && (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <FeatureList title="Needs met" items={needsMet} tone="emerald" />
-          <FeatureList title="Wants met" items={wantsMet} tone="sky" />
-          <FeatureList title="Watch-outs" items={flags} tone="rose" />
-        </div>
-      )}
-    </article>
-  );
+  const missed = [...asList(match.scoreBreakdown, 'needsMissed'), ...asList(match.scoreBreakdown, 'wantsMissed')];
+  const rationale = asText(match.scoreBreakdown, 'rationale');
+  return <article className={`match-card ${match.listingStatus === 'price_drop' ? 'price-drop' : 'new-match'}`}>
+    <div className="match-rank">#{index + 1}</div>
+    <div className="match-info"><div className="match-addr">{match.address}</div><div className="match-meta">{propertyMeta(match)}{addressLine(match) && <><span className="meta-dot"/>{addressLine(match)}</>}{typeof match.daysOnMarket === 'number' && <><span className="meta-dot"/>{match.daysOnMarket} days listed</>}<span className={`badge ${isHotlisted ? 'hot' : match.listingStatus === 'price_drop' ? 'drop' : 'new'}`}>{isHotlisted ? 'Hotlisted' : statusLabel(match.listingStatus)}</span></div><div className="score-row"><ScoreRing score={match.score}/><div><div className="score-title">{match.score}% brief fit</div><div className="score-sub">{needsMet.length ? `Needs: ${needsMet.slice(0, 3).join(', ')}` : rationale || 'Matched against your saved buyer brief.'}{missed.length ? ` · Watch: ${missed.slice(0, 2).join(', ')}` : ''}</div></div></div><div className="liam-note">{match.liamNote || rationale || 'Liam matched this property against your non-negotiables, needs, and wants.'}</div>{(wantsMet.length || flags.length) ? <div className="mini-tags">{wantsMet.slice(0,3).map((x) => <span className="mini sky" key={x}>{x}</span>)}{flags.slice(0,3).map((x) => <span className="mini rose" key={x}>{x}</span>)}</div> : null}</div>
+    <div className="match-right"><div className="match-price">{match.priceDisplay || money(match.price)}</div><div className="match-actions">{match.listingUrl && <a className="btn-secondary" href={match.listingUrl} target="_blank" rel="noreferrer">View listing</a>}<button type="button" className="btn-cma" disabled={!hotlistRow?.cma} onClick={onViewCma} title={hotlistRow?.cma ? 'Open archived CMA' : 'Run a full CMA first'}>View CMA</button><button type="button" className="btn-cma" disabled={!hotlistRow || cmaGenerating} onClick={onRunCma}>{cmaGenerating ? 'Running…' : hotlistRow?.cma ? 'Refresh CMA' : 'Run Full CMA'}</button><button type="button" className={`btn-add ${isHotlisted ? 'added' : ''}`} disabled={isHotlisted || adding} onClick={onAdd}>{isHotlisted ? 'Added' : adding ? 'Adding…' : 'Add to hotlist'}</button></div></div>
+  </article>;
 }
 
-function FeatureList({ title, items, tone }: { title: string; items: string[]; tone: 'emerald' | 'sky' | 'rose' }) {
-  const toneClasses = {
-    emerald: 'bg-emerald-50 text-emerald-800',
-    sky: 'bg-sky-50 text-sky-800',
-    rose: 'bg-rose-50 text-rose-800',
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl p-3 ${toneClasses}`}>
-      <div className="text-xs font-bold uppercase tracking-wide opacity-75">{title}</div>
-      {items.length > 0 ? (
-        <ul className="mt-2 space-y-1 text-sm">
-          {items.slice(0, 4).map((item) => <li key={item}>• {item}</li>)}
-        </ul>
-      ) : (
-        <div className="mt-2 text-sm opacity-75">None flagged.</div>
-      )}
-    </div>
-  );
+function HotlistCard({ row, removing, cmaGenerating, onRemove, onViewCma, onRunCma }: { row: HotlistRow; removing: boolean; cmaGenerating: boolean; onRemove: () => void; onViewCma: () => void; onRunCma: () => void }) {
+  const match = row.match; const statusClass = row.hotlist.status === 'stale' ? 'stale' : row.hotlist.status === 'sold' ? 'sold' : row.hotlist.status === 'under_offer' ? 'offer' : 'active';
+  return <article className={`hotlist-card ${statusClass}`}>{row.hotlist.status === 'stale' && <div className="stale-banner"><strong>No longer a perfect fit.</strong> {row.hotlist.staleReason || 'This property may need review against your updated brief.'}</div>}<div><div className="match-addr">{match?.address || `Match #${row.hotlist.matchId}`}</div><div className="match-meta">{propertyMeta(match)}{addressLine(match) && <><span className="meta-dot"/>{addressLine(match)}</>}<span className={`badge ${statusClass}`}>{statusLabel(row.hotlist.status)}</span></div>{row.hotlist.inspectionNote && <div className="note-box"><strong>Inspection note</strong><br/>{row.hotlist.inspectionNote}</div>}{(row.hotlist.liamSuggestion || row.hotlist.suggestedPrice) && <div className="note-box liam"><strong>LIAM’S OFFER NOTE</strong><br/>{row.hotlist.liamSuggestion || `Suggested guide: ${money(row.hotlist.suggestedPrice, 'pending')}.`}</div>}<div className="cma-mini"><div><span>Fit</span><b>{match?.score ?? '—'}%</b></div><div><span>Last price</span><b>{money(row.hotlist.lastPrice ?? match?.price, '—')}</b></div><div><span>Added</span><b>{formatDate(row.hotlist.addedAt)}</b></div></div></div><div className="match-right"><div className="match-price">{match?.priceDisplay || money(match?.price ?? row.hotlist.lastPrice)}</div><div className="match-actions">{match?.listingUrl && <a className="btn-secondary" href={match.listingUrl} target="_blank" rel="noreferrer">Listing</a>}<button type="button" className="btn-cma" disabled={!row.cma} onClick={onViewCma} title={row.cma ? 'Open archived CMA' : 'Run a full CMA first'}>View CMA</button><button type="button" className="btn-cma" disabled={!match || cmaGenerating} onClick={onRunCma}>{cmaGenerating ? 'Running…' : row.cma ? 'Refresh CMA' : 'Run Full CMA'}</button><button type="button" className="btn-remove" onClick={onRemove} disabled={removing}>{removing ? 'Removing…' : 'Remove'}</button></div></div></article>;
 }
+
+function SectionHeader({ title, count, linkLabel, onLink }: { title: string; count: number; linkLabel: string; onLink: () => void }) { return <div className="section-hdr"><div><h1>{title}</h1><span>{count}</span></div><button type="button" onClick={onLink}>{linkLabel}</button></div>; }
+function BriefDetail({ label, value }: { label: string; value: string }) { return <div className="brief-card"><div>{label}</div><p>{value || 'Not specified'}</p></div>; }
+function Field({ label, value }: { label: string; value: string }) { return <div className="account-field"><label>{label}</label><div>{value}</div></div>; }
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { user, loading } = useAuth();
+  const { user, loading, logout, refresh } = useAuth();
   const utils = trpc.useUtils();
+  const [activeTab, setActiveTab] = useState<TabId>('matches');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [briefSaved, setBriefSaved] = useState(false);
+  const [briefForm, setBriefForm] = useState<EditBriefForm>(emptyBriefForm);
+  const [localNotifications, setLocalNotifications] = useState<Record<NotificationKey, boolean>>(defaultNotifications);
 
-  const dashboard = trpc.dashboard.get.useQuery(undefined, {
-    enabled: !!user,
-    retry: false,
-  });
-  const runSearch = trpc.search.run.useMutation({
-    onSuccess: async () => {
-      await utils.dashboard.get.invalidate();
-      setActionError(null);
-    },
-    onError: (error) => setActionError(error.message),
-  });
-  const addHotlist = trpc.hotlist.add.useMutation({
-    onSuccess: async () => {
-      await utils.dashboard.get.invalidate();
-      setActionError(null);
-    },
-    onError: (error) => setActionError(error.message),
-  });
+  const dashboard = trpc.dashboard.get.useQuery(undefined, { enabled: !!user, retry: false });
+  const runSearch = trpc.search.run.useMutation({ onSuccess: async () => { await utils.dashboard.get.invalidate(); setActionError(null); setActiveTab('matches'); }, onError: (e) => setActionError(e.message) });
+  const addHotlist = trpc.hotlist.add.useMutation({ onSuccess: async () => { await utils.dashboard.get.invalidate(); setActionError(null); }, onError: (e) => setActionError(e.message) });
+  const removeHotlist = trpc.hotlist.remove.useMutation({ onSuccess: async () => { await utils.dashboard.get.invalidate(); setActionError(null); }, onError: (e) => setActionError(e.message) });
+  const updateBrief = trpc.brief.update.useMutation({ onSuccess: async () => { await utils.dashboard.get.invalidate(); setBriefSaved(true); setEditOpen(false); setActionError(null); }, onError: (e) => setActionError(e.message) });
+  const updateNotifications = trpc.user.updateNotifications.useMutation({ onSuccess: async () => { await refresh(); await utils.dashboard.get.invalidate(); setActionError(null); }, onError: (e) => setActionError(e.message) });
+  const generateCma = trpc.cma.generate.useMutation({ onSuccess: async (result) => { await utils.dashboard.get.invalidate(); setActionError(null); if (result.url) navigate(result.url); }, onError: (e) => setActionError(e.message) });
 
-  const data = dashboard.data;
-  const hotlistedIds = useMemo(() => new Set((data?.hotlist || []).map((row) => row.hotlist.matchId)), [data?.hotlist]);
-  const briefNeeds = parseJsonList(data?.activeBrief?.needs);
-  const briefWants = parseJsonList(data?.activeBrief?.wants);
-  const briefNns = parseJsonList(data?.activeBrief?.nonNegotiables);
+  const data = dashboard.data; const activeBrief = data?.activeBrief ?? null; const matches = (data?.matches || []) as MatchCard[]; const hotlistRows = ((data?.hotlist || []) as HotlistRow[]).filter((r) => r.hotlist.status !== 'removed'); const hotlistedIds = useMemo(() => new Set(hotlistRows.map((r) => r.hotlist.matchId)), [hotlistRows]); const hotlistByMatchId = useMemo(() => new Map(hotlistRows.map((r) => [r.hotlist.matchId, r])), [hotlistRows]);
+  useEffect(() => { setBriefForm(formFromBrief(activeBrief)); }, [activeBrief]);
+  useEffect(() => { setLocalNotifications({ ...defaultNotifications, ...((user?.notifications || {}) as Partial<Record<NotificationKey, boolean>>) }); }, [user?.id, user?.notifications]);
+  useEffect(() => { document.body.style.background = '#1E1E1E'; return () => { document.body.style.background = ''; }; }, []);
+  useEffect(() => { if (loading || user) return; navigate(hasStoredBriefForSignup() ? '/signup' : '/login'); }, [loading, navigate, user]);
 
-  if (loading) {
-    return <div className="min-h-screen bg-slate-50 p-8 text-slate-600">Loading your dashboard…</div>;
-  }
+  function openEdit() { setBriefForm(formFromBrief(activeBrief)); setEditOpen(true); }
+  function saveBrief(event: FormEvent) { event.preventDefault(); if (!activeBrief) return; updateBrief.mutate({ id: activeBrief.id, data: { suburbs: briefForm.suburbs, type: briefForm.type, beds: briefForm.beds, baths: briefForm.baths, parking: briefForm.parking, budget: briefForm.budgetDisplay, budgetDisplay: briefForm.budgetDisplay, purchaseIntent: briefForm.purchaseIntent, flex: briefForm.flex, nonNegotiables: briefForm.nonNegotiables, needs: briefForm.needs, wants: briefForm.wants, niceToHaves: briefForm.niceToHaves, story: briefForm.story, finance: briefForm.finance, financeStatus: briefForm.finance, timeline: briefForm.timeline } }); }
+  function changeNotification(key: NotificationKey, checked: boolean) { const next = { ...localNotifications, [key]: checked }; setLocalNotifications(next); updateNotifications.mutate(next); }
+  function viewCma(row?: HotlistRow) { if (row?.cma) { navigate(`/cma/${row.cma.suburbSlug}/${row.cma.addressSlug}`); return; } setActionError('Run the full CMA first, then it will be archived here for repeat viewing.'); }
+  function runFullCma(row?: HotlistRow) { if (!row) { setActionError('Add this property to your hotlist before running a full CMA.'); return; } if (!row.match) { setActionError('The matched property details are missing for this hotlist entry.'); return; } generateCma.mutate({ hotlistId: row.hotlist.id, address: row.match.address, suburb: row.match.suburb || undefined }); }
 
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-        <div className="max-w-md rounded-3xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-950">Sign in to view your matches</h1>
-          <p className="mt-3 text-slate-600">Your buyer dashboard is protected so your brief, matches, and hotlist remain private.</p>
-          <button className="mt-6 rounded-full bg-slate-950 px-5 py-3 font-semibold text-white" onClick={() => navigate('/login')}>Go to login</button>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="bb-dashboard bb-auth"><style>{dashboardStyles}</style><div className="auth-card">Loading your dashboard…</div></div>;
+  if (!user) return <div className="bb-dashboard bb-auth"><style>{dashboardStyles}</style><div className="auth-card">Redirecting you to the right place…</div></div>;
 
-  return (
-    <main className="min-h-screen bg-[#f7f4ef] px-4 py-6 sm:px-6 lg:px-10">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-6 flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300">BuyersBrief Dashboard</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight">Welcome back{user.firstName ? `, ${user.firstName}` : ''}</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              This dashboard now reflects your saved buyer brief, AI-generated property matches, and live hotlist state from the backend.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10" onClick={() => navigate('/brief')}>Edit / create brief</button>
-            <button
-              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={runSearch.isPending || !data?.activeBrief}
-              onClick={() => data?.activeBrief && runSearch.mutate({ briefId: data.activeBrief.id })}
-            >
-              {runSearch.isPending ? 'Refreshing matches…' : 'Run AI search'}
-            </button>
-          </div>
-        </header>
+  const title = activeTab === 'matches' ? 'New matches' : activeTab === 'hotlist' ? 'My hotlist' : activeTab === 'brief' ? 'My brief' : 'Account';
+  const sub = activeTab === 'matches' ? 'Fresh AI-ranked properties from Liam based on your saved brief.' : activeTab === 'hotlist' ? 'Shortlisted properties with notes, price context, and CMA placeholders.' : activeTab === 'brief' ? 'The live backend brief powering your daily property matching.' : 'Signup details, notification preferences, and subscription status.';
 
-        {(dashboard.error || actionError) && (
-          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-            {actionError || dashboard.error?.message}
-          </div>
-        )}
-
-        <section className="mb-6 grid gap-4 md:grid-cols-4">
-          <Metric label="Active brief" value={data?.activeBrief ? 'Saved' : 'None'} />
-          <Metric label="AI matches" value={String(data?.matches?.length || 0)} />
-          <Metric label="Hotlist" value={String(data?.hotlist?.length || 0)} />
-          <Metric label="Tier" value={user.tier || 'free'} />
-        </section>
-
-        <section className="mb-6 grid gap-5 lg:grid-cols-[1fr_360px]">
-          <div className="rounded-3xl bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Current buyer brief</h2>
-                <p className="text-sm text-slate-500">The backend record Liam is matching against.</p>
-              </div>
-              {data?.activeBrief && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{data.activeBrief.status}</span>}
-            </div>
-            {data?.activeBrief ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <BriefLine label="Location" value={data.activeBrief.suburbs || 'Not specified'} />
-                <BriefLine label="Property" value={[data.activeBrief.type, data.activeBrief.beds ? `${data.activeBrief.beds} bed` : null, data.activeBrief.baths ? `${data.activeBrief.baths} bath` : null].filter(Boolean).join(' · ') || 'Not specified'} />
-                <BriefLine label="Budget" value={data.activeBrief.budgetDisplay || money(data.activeBrief.budget, 'Not specified')} />
-                <BriefLine label="Timeline" value={data.activeBrief.timeline || 'Not specified'} />
-                <BriefTagGroup title="Non-negotiables" items={briefNns} />
-                <BriefTagGroup title="Needs" items={briefNeeds} />
-                <BriefTagGroup title="Wants" items={briefWants} />
-              </div>
-            ) : (
-              <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
-                No saved buyer brief yet. Create one to unlock AI-generated matches.
-              </div>
-            )}
-          </div>
-
-          <aside className="rounded-3xl bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">Hotlist</h2>
-            <p className="mt-1 text-sm text-slate-500">Properties you have shortlisted for deeper review.</p>
-            <div className="mt-4 space-y-3">
-              {(data?.hotlist || []).length > 0 ? data?.hotlist.map((row) => (
-                <div key={row.hotlist.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="font-semibold text-slate-950">{row.match?.address || `Match #${row.hotlist.matchId}`}</div>
-                  <div className="mt-1 text-sm text-slate-500">{row.match?.priceDisplay || money(row.match?.price)}</div>
-                </div>
-              )) : (
-                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">No hotlisted properties yet.</div>
-              )}
-            </div>
-          </aside>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-950">Liam’s matches</h2>
-              <p className="text-sm text-slate-600">Ranked by how closely each property fits the saved brief.</p>
-            </div>
-          </div>
-
-          {dashboard.isPending ? (
-            <div className="rounded-3xl bg-white p-8 text-slate-600 shadow-sm">Loading live matches…</div>
-          ) : (data?.matches || []).length > 0 ? (
-            data?.matches.map((match) => (
-              <MatchCardView
-                key={match.id}
-                match={match as MatchCard}
-                isHotlisted={hotlistedIds.has(match.id)}
-                hotlisting={addHotlist.isPending && addHotlist.variables?.matchId === match.id}
-                onHotlist={() => addHotlist.mutate({ matchId: match.id })}
-              />
-            ))
-          ) : (
-            <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
-              <h3 className="text-xl font-bold text-slate-950">No matches yet</h3>
-              <p className="mx-auto mt-2 max-w-xl text-slate-600">Create a buyer brief, then run the AI search to generate the first match set into your dashboard.</p>
-              <button className="mt-5 rounded-full bg-slate-950 px-5 py-3 font-semibold text-white" onClick={() => navigate('/brief')}>Create buyer brief</button>
-            </div>
-          )}
-        </section>
-      </div>
-    </main>
-  );
+  return <div className="bb-dashboard"><style>{dashboardStyles}</style><div className="shell"><aside className="sidebar"><div className="sidebar-logo"><BBIcon size={30}/><div className="wordmark"><b>BUYERS</b><span>BRIEF</span><em>AUSTRALIA</em></div></div><div className="sidebar-brief"><small>Active brief</small><strong>{activeBrief ? displayList(activeBrief.suburbs, 'Locations pending') : 'No saved brief yet'}</strong><p>{activeBrief ? `${activeBrief.type || 'Any property'} · ${activeBrief.beds || 'Any'} bed · ${activeBrief.budgetDisplay || money(activeBrief.budget)}` : 'Create a brief to unlock AI-ranked properties.'}</p><i>{activeBrief ? 'RUNNING DAILY' : 'WAITING FOR BRIEF'}</i><button onClick={activeBrief ? openEdit : () => navigate('/brief')}>{activeBrief ? 'Edit brief →' : 'Create brief →'}</button></div><nav>{(['matches','hotlist','brief','account'] as TabId[]).map((tab) => <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}><BBIcon size={12} inverted/>{tab === 'matches' ? 'New matches' : tab === 'hotlist' ? 'My hotlist' : tab === 'brief' ? 'My brief' : 'Account'}{tab === 'matches' && <span>{matches.length}</span>}{tab === 'hotlist' && <span>{hotlistRows.length}</span>}</button>)}</nav><div className="upgrade"><b>CMA archive</b><p>Run a full CMA from your hotlist, then reopen the archived report whenever you need it.</p><button type="button" onClick={() => setActiveTab('hotlist')}>Open hotlist</button></div><div className="sidebar-user"><div>{initials(user.firstName, user.lastName, user.email)}</div><section><b>{[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}</b><small>{tierLabel(user.tier)} plan</small></section><button onClick={() => logout().then(() => navigate('/login'))}>Log out</button></div></aside><main className="main"><header className="topbar"><div><h2>{title}</h2><p>{sub}</p></div><div><span>Updated {activeBrief?.lastRunAt ? formatDate(activeBrief.lastRunAt) : 'when your next search runs'}</span><button disabled={runSearch.isPending || !activeBrief} onClick={() => activeBrief && runSearch.mutate({ briefId: activeBrief.id })}>↻ {runSearch.isPending ? 'Running…' : 'Run AI search'}</button></div></header><section className="content">{(dashboard.error || actionError) && <div className="alert-error">{actionError || dashboard.error?.message}</div>}{briefSaved && <div className="saved-msg"><b>LIAM</b><p>Your brief has been updated. <em>Run AI search to refresh matches against the latest criteria.</em></p><button onClick={() => setBriefSaved(false)}>Dismiss</button></div>}
+    {activeTab === 'matches' && <div><SectionHeader title="New matches" count={matches.length} linkLabel="Review brief" onLink={() => setActiveTab('brief')}/>{dashboard.isPending ? <EmptyState title="Loading live matches">Fetching your dashboard data from the backend.</EmptyState> : matches.length ? <div className="cards">{matches.map((m, i) => { const row = hotlistByMatchId.get(m.id); return <DashboardMatchCard key={m.id} match={m} index={i} isHotlisted={hotlistedIds.has(m.id)} hotlistRow={row} adding={addHotlist.isPending && addHotlist.variables?.matchId === m.id} cmaGenerating={generateCma.isPending && generateCma.variables?.hotlistId === row?.hotlist.id} onAdd={() => addHotlist.mutate({ matchId: m.id })} onViewCma={() => viewCma(row)} onRunCma={() => runFullCma(row)}/>; })}</div> : <EmptyState title="No matches yet" action={<button className="btn-add" onClick={() => activeBrief ? runSearch.mutate({ briefId: activeBrief.id }) : navigate('/brief')}>{activeBrief ? 'Run AI search' : 'Create buyer brief'}</button>}>Create a buyer brief, then run Liam’s AI search to generate your first live match set.</EmptyState>}</div>}
+    {activeTab === 'hotlist' && <div><SectionHeader title="My hotlist" count={hotlistRows.length} linkLabel="Back to matches" onLink={() => setActiveTab('matches')}/>{hotlistRows.length ? <div className="cards">{hotlistRows.map((r) => <HotlistCard key={r.hotlist.id} row={r} removing={removeHotlist.isPending && removeHotlist.variables?.id === r.hotlist.id} cmaGenerating={generateCma.isPending && generateCma.variables?.hotlistId === r.hotlist.id} onRemove={() => removeHotlist.mutate({ id: r.hotlist.id })} onViewCma={() => viewCma(r)} onRunCma={() => runFullCma(r)}/>)}</div> : <EmptyState title="No hotlisted properties yet" action={<button className="btn-add" onClick={() => setActiveTab('matches')}>View matches</button>}>Add properties from the matches tab to track them for deeper review.</EmptyState>}</div>}
+    {activeTab === 'brief' && <div><SectionHeader title="My brief" count={activeBrief ? 1 : 0} linkLabel={activeBrief ? 'Edit brief' : 'Create brief'} onLink={activeBrief ? openEdit : () => navigate('/brief')}/>{activeBrief ? <div className="brief-grid"><BriefDetail label="Suburbs" value={displayList(activeBrief.suburbs)}/><BriefDetail label="Property type" value={activeBrief.type || 'Not specified'}/><BriefDetail label="Beds / Baths / Parking" value={[activeBrief.beds ? `${activeBrief.beds} bed` : null, activeBrief.baths ? `${activeBrief.baths} bath` : null, activeBrief.parking ? `${activeBrief.parking} parking` : null].filter(Boolean).join(' · ')}/><BriefDetail label="Budget" value={activeBrief.budgetDisplay || money(activeBrief.budget, 'Not specified')}/><BriefDetail label="Timeline" value={activeBrief.timeline || 'Not specified'}/><BriefDetail label="Intent" value={statusLabel(activeBrief.purchaseIntent)}/><BriefDetail label="Non-negotiables" value={displayList(activeBrief.nonNegotiables)}/><BriefDetail label="Needs" value={displayList(activeBrief.needs)}/><BriefDetail label="Wants" value={displayList(activeBrief.wants)}/><BriefDetail label="Nice-to-haves" value={displayList(activeBrief.niceToHaves)}/><BriefDetail label="Finance" value={activeBrief.financeStatus || activeBrief.finance || 'Not specified'}/><BriefDetail label="Buyer story" value={activeBrief.story || 'Not specified'}/><div className="brief-actions"><button className="btn-add" onClick={() => runSearch.mutate({ briefId: activeBrief.id })} disabled={runSearch.isPending}>{runSearch.isPending ? 'Running search…' : 'Run AI Search'}</button><button className="btn-secondary" onClick={openEdit}>Edit brief</button></div></div> : <EmptyState title="No saved brief" action={<button className="btn-add" onClick={() => navigate('/brief')}>Create buyer brief</button>}>Create a brief to give Liam your target suburbs, non-negotiables, needs, and budget.</EmptyState>}</div>}
+    {activeTab === 'account' && <div><SectionHeader title="Account" count={1} linkLabel="Refresh" onLink={() => refresh()}/><div className="account-grid"><div className="account-card"><h3>Profile details</h3><Field label="First name" value={user.firstName || 'Not provided'}/><Field label="Last name" value={user.lastName || 'Not provided'}/><Field label="Email" value={user.email}/><Field label="Mobile" value={user.mobile || 'Not provided'}/><Field label="Joined" value={formatDate(user.createdAt)}/></div><div className="account-card"><h3>Subscription</h3><div className="sub-badge">{tierLabel(user.tier)}</div><Field label="Dashboard access" value="Active"/><Field label="Saved briefs" value={String(data?.briefs?.length || 0)}/><Field label="Hotlist entries" value={String(hotlistRows.length)}/><button className="btn-secondary" disabled>Manage plan coming soon</button></div></div><div className="account-card"><h3>Notification preferences</h3>{([['dailyEmail','Daily email matches','Receive a digest when Liam finds new matches.'],['hotSms','Hot property SMS','Text alerts for unusually strong matches.'],['priceDrop','Price drops','Notify me when a watched listing price changes.'],['statusChange','Status changes','Under-offer, sold, stale, and off-market updates.'],['weeklyDigest','Weekly digest','Summary of brief performance and hotlist movement.']] as [NotificationKey,string,string][]).map(([key,label,desc]) => <div className="notif-row" key={key}><div><b>{label}</b><small>{desc}</small></div><label className="switch"><input type="checkbox" checked={localNotifications[key]} disabled={updateNotifications.isPending} onChange={(e) => changeNotification(key, e.target.checked)}/><span/></label></div>)}</div></div>}
+  </section></main></div><EditBriefModal open={editOpen} form={briefForm} saving={updateBrief.isPending} onChange={(patch) => setBriefForm((x) => ({ ...x, ...patch }))} onClose={() => setEditOpen(false)} onSubmit={saveBrief}/></div>;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-3xl bg-white p-5 shadow-sm">
-      <div className="text-sm font-semibold text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-bold text-slate-950">{value}</div>
-    </div>
-  );
+function EditBriefModal({ open, form, saving, onChange, onClose, onSubmit }: { open: boolean; form: EditBriefForm; saving: boolean; onChange: (patch: Partial<EditBriefForm>) => void; onClose: () => void; onSubmit: (event: FormEvent) => void }) {
+  return <div className={`edit-modal-overlay ${open ? 'open' : ''}`} onMouseDown={(e) => { if (e.currentTarget === e.target) onClose(); }}><form className="edit-modal" onSubmit={onSubmit}><header><div><h2>Edit your brief</h2><p>Changes save to the backend brief Liam uses for matching.</p></div><button type="button" onClick={onClose}>✕</button></header><div className="edit-body"><h4>Basics</h4><div className="edit-row"><EditInput label="Suburbs" value={form.suburbs} onChange={(suburbs) => onChange({ suburbs })}/><EditInput label="Property type" value={form.type} onChange={(type) => onChange({ type })}/></div><div className="edit-row"><EditInput label="Beds" value={form.beds} onChange={(beds) => onChange({ beds })}/><EditInput label="Baths" value={form.baths} onChange={(baths) => onChange({ baths })}/></div><div className="edit-row"><EditInput label="Parking" value={form.parking} onChange={(parking) => onChange({ parking })}/><EditInput label="Budget" value={form.budgetDisplay} onChange={(budgetDisplay) => onChange({ budgetDisplay })}/></div><div className="edit-row"><label><span>Intent</span><select value={form.purchaseIntent} onChange={(e) => onChange({ purchaseIntent: normalizeIntent(e.target.value) })}><option value="live">Live in</option><option value="invest">Invest</option><option value="both">Both</option></select></label><EditInput label="Timeline" value={form.timeline} onChange={(timeline) => onChange({ timeline })}/></div><EditText label="Flex" value={form.flex} onChange={(flex) => onChange({ flex })}/><h4>Decision criteria</h4><EditText label="Non-negotiables" value={form.nonNegotiables} onChange={(nonNegotiables) => onChange({ nonNegotiables })}/><EditText label="Needs" value={form.needs} onChange={(needs) => onChange({ needs })}/><EditText label="Wants" value={form.wants} onChange={(wants) => onChange({ wants })}/><EditText label="Nice-to-haves" value={form.niceToHaves} onChange={(niceToHaves) => onChange({ niceToHaves })}/><h4>Buyer context</h4><EditText label="Story" value={form.story} onChange={(story) => onChange({ story })}/><EditText label="Finance" value={form.finance} onChange={(finance) => onChange({ finance })}/></div><footer><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button type="submit" className="btn-add" disabled={saving}>{saving ? 'Saving…' : 'Save brief'}</button></footer></form></div>;
 }
+function EditInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label><span>{label}</span><input value={value} onChange={(e) => onChange(e.target.value)}/></label>; }
+function EditText({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="edit-text"><span>{label}</span><textarea value={value} onChange={(e) => onChange(e.target.value)}/></label>; }
 
-function BriefLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-1 font-semibold text-slate-900">{value}</div>
-    </div>
-  );
-}
-
-function BriefTagGroup({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4 md:col-span-2">
-      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{title}</div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {items.length > 0 ? items.map((item) => (
-          <span key={item} className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-700">{item}</span>
-        )) : <span className="text-sm text-slate-500">Not specified</span>}
-      </div>
-    </div>
-  );
-}
+const dashboardStyles = `
+.bb-dashboard{--sky:#4A90D9;--sky-dark:#3478C0;--rose:#E8B4B8;--steel:#7FA8D4;--offwhite:#F4F1EC;--charcoal:#1E1E1E;--c2:#252525;--c3:#2E2E2E;--rule:rgba(127,168,212,.12);--green:#4CAF7D;--amber:#E8A44A;--red:#E8614A;min-height:100vh;background:var(--charcoal);color:var(--offwhite);font-family:Figtree,system-ui,sans-serif}.bb-dashboard *{box-sizing:border-box}.bb-dashboard button,.bb-dashboard input,.bb-dashboard textarea,.bb-dashboard select{font:inherit}.bb-dashboard button:disabled{cursor:not-allowed;opacity:.55}.bbi{position:relative;display:inline-flex;flex-shrink:0}.bbi .doc{position:absolute;inset:0;background:var(--sky);border-radius:3px}.bbi .fold{position:absolute;right:0;top:0;width:31%;height:28%;background:var(--rose);clip-path:polygon(0 0,100% 0,100% 100%)}.bbi .dls{position:absolute;top:32%;left:18%;width:64%;display:flex;flex-direction:column;gap:3px}.bbi .dls span{height:2px;background:rgba(244,241,236,.75);border-radius:2px}.bbi-inv .doc{background:rgba(74,144,217,.35)}.shell{display:flex;height:100vh;overflow:hidden}.sidebar{width:248px;background:var(--c2);border-right:1px solid var(--rule);display:flex;flex-direction:column;overflow:auto}.sidebar-logo{padding:20px;border-bottom:1px solid var(--rule);display:flex;gap:10px;align-items:center}.wordmark{line-height:1}.wordmark b{display:block;font-family:Outfit,sans-serif;font-size:15px}.wordmark span{display:block;font-family:Outfit,sans-serif;color:var(--sky);letter-spacing:2px}.wordmark em{display:block;font-size:7px;color:var(--sky);letter-spacing:1.5px;font-style:normal}.sidebar-brief{padding:16px;border-bottom:1px solid var(--rule);background:rgba(74,144,217,.05)}.sidebar-brief small,.sidebar-brief i{display:block;color:var(--steel);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-style:normal}.sidebar-brief strong{display:block;margin:8px 0 3px;font-family:Outfit,sans-serif;font-size:14px}.sidebar-brief p{margin:0 0 10px;color:var(--steel);font-size:11px;line-height:1.45}.sidebar-brief i{display:inline-block;color:var(--green);background:rgba(76,175,125,.12);border:1px solid rgba(76,175,125,.25);padding:4px 9px;border-radius:10px}.sidebar-brief button,.sidebar nav button,.section-hdr button,.topbar button,.saved-msg button,.sidebar-user button{background:none;border:0;color:var(--steel);cursor:pointer}.sidebar-brief button{display:block;margin-top:8px;padding:0;font-size:11px}.sidebar nav{padding:12px 0;flex:1}.sidebar nav button{width:100%;display:flex;align-items:center;gap:10px;padding:11px 18px;text-align:left;font-size:13px;border-left:2px solid transparent}.sidebar nav button:hover,.sidebar nav button.active{color:var(--offwhite);background:rgba(74,144,217,.08);border-left-color:var(--sky)}.sidebar nav span{margin-left:auto;background:var(--rose);color:#111;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700}.upgrade{margin:12px;padding:16px;border:1px solid rgba(232,180,184,.2);border-radius:10px;background:rgba(232,180,184,.06)}.upgrade b{font-size:10px;color:var(--rose);letter-spacing:1px;text-transform:uppercase}.upgrade p{font-size:11px;color:var(--steel);line-height:1.5}.upgrade button{width:100%;background:var(--rose);border:0;border-radius:7px;padding:8px;font-weight:700}.sidebar-user{padding:12px 16px;border-top:1px solid var(--rule);display:flex;align-items:center;gap:10px}.sidebar-user>div{width:32px;height:32px;border-radius:50%;background:rgba(74,144,217,.12);border:1px solid rgba(74,144,217,.3);display:flex;align-items:center;justify-content:center;color:var(--sky);font-weight:700}.sidebar-user section{flex:1}.sidebar-user b{display:block;font-size:12px}.sidebar-user small{display:block;font-size:10px;color:var(--steel)}.sidebar-user button{font-size:10px}.main{flex:1;overflow:auto}.topbar{position:sticky;top:0;z-index:2;padding:16px 28px;border-bottom:1px solid var(--rule);background:var(--c2);display:flex;justify-content:space-between;gap:18px}.topbar h2{font-family:Outfit,sans-serif;font-size:17px;margin:0}.topbar p{margin:2px 0 0;color:var(--steel);font-size:11px}.topbar div:last-child{display:flex;align-items:center;gap:14px}.topbar span{font-size:11px;color:rgba(127,168,212,.55)}.topbar button{color:var(--sky);font-size:11px}.content{padding:24px 28px}.alert-error{margin-bottom:14px;padding:13px 15px;border-radius:9px;background:rgba(232,97,74,.08);border:1px solid rgba(232,97,74,.2);color:var(--rose);font-size:12px}.section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.section-hdr>div{display:flex;align-items:center;gap:10px}.section-hdr h1{font-family:Outfit,sans-serif;font-size:16px;margin:0}.section-hdr span{background:rgba(74,144,217,.12);color:var(--sky);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700}.section-hdr button{font-size:12px}.cards{display:flex;flex-direction:column;gap:10px}.match-card,.hotlist-card{background:var(--c2);border:1px solid var(--rule);border-radius:11px;padding:16px 18px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;position:relative;overflow:hidden}.hotlist-card{grid-template-columns:1fr auto;align-items:start}.match-card:before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--sky)}.match-card.price-drop:before{background:var(--green)}.match-rank{width:36px;height:36px;border-radius:8px;background:rgba(74,144,217,.1);color:var(--sky);display:flex;align-items:center;justify-content:center;font-weight:800}.match-addr{font-family:Outfit,sans-serif;font-size:14px;font-weight:700;margin-bottom:4px}.match-meta{font-size:11px;color:var(--steel);display:flex;gap:8px;flex-wrap:wrap;align-items:center}.meta-dot{width:3px;height:3px;background:var(--steel);border-radius:50%;opacity:.4}.badge{font-size:9px;border-radius:8px;padding:2px 8px}.badge.new{background:rgba(74,144,217,.15);color:var(--sky)}.badge.drop,.badge.active{background:rgba(76,175,125,.15);color:var(--green)}.badge.hot{background:rgba(232,180,184,.15);color:var(--rose)}.badge.stale,.badge.offer{background:rgba(232,164,74,.12);color:var(--amber)}.badge.sold{background:rgba(232,97,74,.12);color:var(--red)}.score-row{display:flex;align-items:center;gap:10px;margin-top:7px}.score-ring{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:4px solid;color:var(--green);font-family:Outfit,sans-serif;font-size:11px;font-weight:800}.score-ring.med{color:var(--amber)}.score-ring.low{color:var(--rose)}.score-title{font-family:Outfit,sans-serif;font-size:12px;font-weight:800;color:var(--green)}.score-sub,.liam-note{font-size:10px;color:var(--steel);line-height:1.45}.liam-note{font-style:italic;margin-top:5px;color:rgba(127,168,212,.65)}.mini-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mini{font-size:9px;padding:2px 7px;border-radius:8px}.mini.sky{background:rgba(74,144,217,.1);color:var(--sky)}.mini.rose{background:rgba(232,180,184,.1);color:var(--rose)}.match-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}.match-price{font-family:Outfit,sans-serif;font-size:15px;font-weight:800;white-space:nowrap}.match-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.btn-add,.btn-secondary,.btn-cma,.btn-remove{font-size:10px;border-radius:6px;padding:6px 10px;text-decoration:none}.btn-add{background:var(--sky);border:0;color:#fff;font-weight:700}.btn-add.added{background:rgba(76,175,125,.2);color:var(--green)}.btn-secondary,.btn-cma{background:none;border:1px solid rgba(127,168,212,.18);color:rgba(127,168,212,.8)}.btn-remove{background:none;border:0;color:rgba(127,168,212,.45)}.stale-banner{grid-column:1/-1;padding:8px 10px;background:rgba(232,164,74,.08);border:1px solid rgba(232,164,74,.2);border-radius:7px;color:var(--amber);font-size:11px}.note-box{margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid rgba(127,168,212,.1);border-radius:7px;font-size:12px;line-height:1.5}.note-box.liam{border-left:3px solid var(--sky);background:rgba(74,144,217,.06)}.cma-mini{margin-top:10px;padding:10px;background:rgba(74,144,217,.05);border:1px solid rgba(74,144,217,.1);border-radius:7px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.cma-mini span{display:block;font-size:9px;color:rgba(127,168,212,.55);text-transform:uppercase}.cma-mini b{font-size:12px}.brief-grid,.account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.brief-card,.account-card{background:var(--c2);border:1px solid var(--rule);border-radius:12px;padding:18px}.brief-card div,.account-field label{font-size:10px;color:var(--steel);letter-spacing:1px;text-transform:uppercase}.brief-card p{margin:7px 0 0;font-size:13px;line-height:1.55}.brief-actions{grid-column:1/-1;display:flex;gap:10px}.account-card h3{font-family:Outfit,sans-serif;font-size:15px;margin:0 0 14px}.account-field{margin-bottom:12px}.account-field div{margin-top:5px;min-height:36px;padding:9px 12px;border:1px solid rgba(127,168,212,.15);border-radius:8px;background:rgba(255,255,255,.04);font-size:12px}.sub-badge{display:inline-block;margin-bottom:12px;background:var(--sky);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:800}.notif-row{display:flex;justify-content:space-between;gap:14px;align-items:center;border-bottom:1px solid var(--rule);padding:11px 0}.notif-row b{display:block;font-size:12px}.notif-row small{display:block;color:var(--steel);font-size:10px;margin-top:2px}.switch{position:relative;width:38px;height:22px}.switch input{opacity:0}.switch span{position:absolute;inset:0;border-radius:20px;background:rgba(127,168,212,.15);border:1px solid rgba(127,168,212,.2)}.switch span:before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--steel);border-radius:50%;transition:.2s}.switch input:checked+span{background:rgba(74,144,217,.3);border-color:var(--sky)}.switch input:checked+span:before{transform:translateX(16px);background:var(--sky)}.saved-msg{margin-bottom:14px;padding:14px 16px;background:rgba(74,144,217,.06);border:1px solid rgba(74,144,217,.15);border-left:3px solid var(--sky);border-radius:0 8px 8px 0}.saved-msg b{color:var(--sky);font-size:10px;letter-spacing:.5px}.saved-msg p{margin:4px 0;color:var(--offwhite);font-size:12px}.saved-msg button{padding:0;font-size:10px}.empty-state,.bb-auth{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}.empty-state{min-height:260px;background:var(--c2);border:1px solid var(--rule);border-radius:12px;padding:36px 24px}.empty-state h3,.auth-card h1{font-family:Outfit,sans-serif;font-size:22px;margin:14px 0 8px}.empty-state p,.auth-card p{font-size:13px;color:var(--steel);line-height:1.6;max-width:520px;margin:0 0 18px}.auth-card{background:var(--c2);border:1px solid var(--rule);border-radius:16px;padding:34px;max-width:440px;text-align:center}.edit-modal-overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,10,10,.85);backdrop-filter:blur(8px);align-items:flex-start;justify-content:center;padding:40px 20px;overflow:auto}.edit-modal-overlay.open{display:flex}.edit-modal{background:var(--c2);border:1px solid rgba(74,144,217,.2);border-radius:14px;width:100%;max-width:640px;overflow:hidden}.edit-modal header,.edit-modal footer{background:var(--charcoal);padding:18px 24px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center}.edit-modal footer{border-top:1px solid var(--rule);border-bottom:0;justify-content:flex-end;gap:10px}.edit-modal h2{font-family:Outfit,sans-serif;font-size:17px;margin:0}.edit-modal p{margin:2px 0 0;color:var(--steel);font-size:11px}.edit-modal header button{background:none;border:0;color:var(--steel);font-size:18px}.edit-body{padding:24px}.edit-body h4{font-size:10px;color:var(--steel);letter-spacing:1.5px;text-transform:uppercase;margin:16px 0 8px}.edit-body h4:first-child{margin-top:0}.edit-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}.edit-modal label span{display:block;margin-bottom:5px;font-size:10px;color:var(--steel);letter-spacing:1px;text-transform:uppercase}.edit-modal input,.edit-modal textarea,.edit-modal select{width:100%;background:rgba(255,255,255,.04);border:1.5px solid rgba(127,168,212,.15);border-radius:8px;color:var(--offwhite);padding:9px 12px;outline:none}.edit-modal textarea{height:72px;resize:none}.edit-text{display:block;margin-bottom:10px}@media(max-width:900px){.shell{height:auto;min-height:100vh;overflow:visible;flex-direction:column}.sidebar{width:100%;height:auto}.sidebar nav{display:grid;grid-template-columns:repeat(4,1fr);padding:0}.sidebar nav button{justify-content:center;border-left:0;border-top:2px solid transparent}.upgrade{display:none}.main{overflow:visible}.topbar{position:static;flex-direction:column}.match-card{grid-template-columns:1fr}.match-rank{position:absolute;right:14px;top:14px}.match-right{align-items:flex-start}.account-grid,.brief-grid,.hotlist-card{grid-template-columns:1fr}.brief-actions{grid-column:auto}.edit-row{grid-template-columns:1fr}}@media(max-width:520px){.content{padding:18px 14px 72px}.topbar{padding:14px}.sidebar nav{grid-template-columns:repeat(2,1fr)}.edit-modal-overlay{padding:0;align-items:flex-end}.edit-modal{border-radius:14px 14px 0 0;max-height:90vh;overflow:auto}.edit-modal footer{flex-direction:column-reverse}.edit-modal footer button{width:100%}}
+`;

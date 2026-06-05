@@ -203,6 +203,7 @@ const productionSchemaStatements = [
   `ALTER TABLE "cmas" ADD COLUMN IF NOT EXISTS "address_slug" text;`,
   `ALTER TABLE "cmas" ADD COLUMN IF NOT EXISTS "generated_at" timestamp DEFAULT now() NOT NULL;`,
   `ALTER TABLE "cmas" ADD COLUMN IF NOT EXISTS "cma_data" jsonb;`,
+  `ALTER TABLE "cmas" ADD COLUMN IF NOT EXISTS "rendered_html" text;`,
   `ALTER TABLE "cmas" ADD COLUMN IF NOT EXISTS "confidence" "cma_confidence" DEFAULT 'medium' NOT NULL;`,
   `DO $$ BEGIN
     ALTER TABLE "matches" ADD CONSTRAINT "matches_brief_id_briefs_id_fk" FOREIGN KEY ("brief_id") REFERENCES "public"."briefs"("id") ON DELETE cascade ON UPDATE no action;
@@ -461,6 +462,13 @@ export async function createUser(data: {
       firstName: data.firstName ?? null,
       lastName: data.lastName ?? null,
       mobile: data.mobile ?? null,
+      notifications: {
+        dailyEmail: true,
+        hotSms: false,
+        priceDrop: true,
+        statusChange: true,
+        weeklyDigest: true,
+      },
       lastSignedIn: new Date(),
     }).returning();
 
@@ -678,15 +686,16 @@ export async function createHotlistEntry(data: InsertHotlistEntry): Promise<Hotl
   return null;
 }
 
-export async function getHotlistByUserId(userId: number): Promise<Array<{ hotlist: HotlistEntry; match: Match | null }>> {
+export async function getHotlistByUserId(userId: number): Promise<Array<{ hotlist: HotlistEntry; match: Match | null; cma: Cma | null }>> {
   const db = getDb();
   if (!db) return [];
 
   try {
     const rows = await db
-      .select({ hotlist, match: matches })
+      .select({ hotlist, match: matches, cma: cmas })
       .from(hotlist)
       .leftJoin(matches, eq(hotlist.matchId, matches.id))
+      .leftJoin(cmas, eq(hotlist.cmaId, cmas.id))
       .where(eq(hotlist.userId, userId))
       .orderBy(desc(hotlist.addedAt));
 
@@ -725,6 +734,38 @@ export async function updateHotlistEntry(
     .returning();
 
   return result.length > 0 ? result[0] : null;
+}
+
+export async function getHotlistEntryWithMatch(
+  hotlistId: number,
+  userId: number,
+): Promise<{ hotlist: HotlistEntry; match: Match | null } | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const rows = await db
+    .select({ hotlist, match: matches })
+    .from(hotlist)
+    .leftJoin(matches, eq(hotlist.matchId, matches.id))
+    .where(and(eq(hotlist.id, hotlistId), eq(hotlist.userId, userId)))
+    .limit(1);
+
+  return rows.length > 0 ? rows[0] : null;
+}
+
+export async function getCmaByHotlistId(hotlistId: number, userId: number): Promise<Cma | null> {
+  const db = getDb();
+  if (!db) return null;
+
+  const rows = await db
+    .select({ cma: cmas })
+    .from(cmas)
+    .innerJoin(hotlist, eq(cmas.hotlistId, hotlist.id))
+    .where(and(eq(cmas.hotlistId, hotlistId), eq(hotlist.userId, userId)))
+    .orderBy(desc(cmas.generatedAt))
+    .limit(1);
+
+  return rows.length > 0 ? rows[0].cma : null;
 }
 
 export async function createCma(data: InsertCma): Promise<Cma | null> {
