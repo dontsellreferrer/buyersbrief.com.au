@@ -26,6 +26,8 @@ type GeneratedPayload = {
   matches: GeneratedMatch[];
 };
 
+export type AISearchMatchPayload = Omit<InsertMatch, "briefId">;
+
 const DEFAULT_STATE = "NSW";
 
 function splitCsv(value: string | null): string[] {
@@ -94,7 +96,7 @@ function briefToPrompt(brief: Brief): string {
   }, null, 2);
 }
 
-function toInsertMatch(match: GeneratedMatch): Omit<InsertMatch, "briefId"> {
+function toInsertMatch(match: GeneratedMatch): AISearchMatchPayload {
   const rawJson = match as unknown as Record<string, unknown>;
   return {
     address: match.address,
@@ -119,7 +121,7 @@ function toInsertMatch(match: GeneratedMatch): Omit<InsertMatch, "briefId"> {
   };
 }
 
-export async function runAISearchForBrief(brief: Brief): Promise<Match[]> {
+export async function generateAISearchMatchesForBrief(brief: Brief): Promise<AISearchMatchPayload[]> {
   const userPrompt = briefToPrompt(brief);
 
   const result = await invokeLLM({
@@ -146,9 +148,18 @@ export async function runAISearchForBrief(brief: Brief): Promise<Match[]> {
     throw new Error("AI search returned no usable matches");
   }
 
-  const saved = await replaceMatchesForBrief(brief.id, validMatches.map(toInsertMatch));
+  return validMatches.map(toInsertMatch);
+}
+
+export async function saveAISearchMatchesForBrief(brief: Brief, matchPayloads: AISearchMatchPayload[]): Promise<Match[]> {
+  const saved = await replaceMatchesForBrief(brief.id, matchPayloads);
   await updateBriefLastRunAt(brief.id);
   return saved;
+}
+
+export async function runAISearchForBrief(brief: Brief): Promise<Match[]> {
+  const generated = await generateAISearchMatchesForBrief(brief);
+  return saveAISearchMatchesForBrief(brief, generated);
 }
 
 export async function getExistingOrRunAISearch(brief: Brief): Promise<Match[]> {

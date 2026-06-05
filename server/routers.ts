@@ -26,7 +26,8 @@ import {
   updateUserNotificationPrefs,
   updateUserTier,
 } from "./db";
-import { runAISearchForBrief } from "./services/search";
+import { generateAISearchMatchesForBrief, runAISearchForBrief, saveAISearchMatchesForBrief, type AISearchMatchPayload } from "./services/search";
+import type { Brief } from "../drizzle/schema";
 
 const nullableString = z.string().trim().optional().nullable();
 const purchaseIntentSchema = z.enum(["live", "invest", "both"]);
@@ -85,6 +86,91 @@ function makeBudgetDisplay(value: string | number | null | undefined, parsed: nu
   if (typeof value === "string" && value.trim().length > 0) return value.trim();
   if (typeof value === "number") return `$${value.toLocaleString("en-AU")}`;
   return parsed ? `$${parsed.toLocaleString("en-AU")}` : null;
+}
+
+function buildBriefRecord(input: z.infer<typeof briefInputSchema>) {
+  const parsedBudget = parseBudget(input.budget ?? input.budgetDisplay);
+  return {
+    suburbs: normalizeSuburbs(input),
+    type: input.propertyType || input.type || null,
+    beds: input.beds || null,
+    baths: input.baths || null,
+    parking: input.parking || null,
+    budget: parsedBudget,
+    budgetDisplay: makeBudgetDisplay(input.budgetDisplay ?? input.budget, parsedBudget),
+    purchaseIntent: input.intent || input.purchaseIntent || "live",
+    flex: input.flex || null,
+    radiusKm: input.radiusKm ?? null,
+    nonNegotiables: normalizeList(input.nonNegotiables),
+    needs: normalizeList(input.needs),
+    wants: normalizeList(input.wants),
+    niceToHaves: normalizeList(input.niceToHaves),
+    story: input.buyerStory || input.story || null,
+    finance: input.financeStatus || input.finance || null,
+    financeStatus: input.financeStatus || input.finance || null,
+    timeline: input.timeline || null,
+    landMinM2: input.landMinM2 ?? null,
+    status: "active" as const,
+    tier: "free" as const,
+  };
+}
+
+function makePreviewBrief(input: z.infer<typeof briefInputSchema>): Brief {
+  const now = new Date();
+  return {
+    id: 0,
+    userId: 0,
+    ...buildBriefRecord(input),
+    lastRunAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+const previewMatchSchema = z.object({
+  address: z.string().min(1),
+  suburb: nullableString,
+  state: nullableString,
+  postcode: nullableString,
+  propertyType: nullableString,
+  bedrooms: z.number().int().nullable().optional(),
+  bathrooms: z.number().int().nullable().optional(),
+  parking: nullableString,
+  landSizeM2: z.number().int().nullable().optional(),
+  price: z.number().int().nullable().optional(),
+  priceDisplay: nullableString,
+  daysOnMarket: z.number().int().nullable().optional(),
+  listingStatus: z.enum(["active", "price_drop", "under_offer", "off_market", "sold"]).optional(),
+  listingUrl: nullableString,
+  score: z.number().int().min(0).max(100).optional(),
+  scoreBreakdown: z.record(z.string(), z.unknown()).nullable().optional(),
+  liamNote: nullableString,
+  rawJson: z.record(z.string(), z.unknown()).nullable().optional(),
+  status: z.enum(["new", "hotlisted", "rejected", "purchased"]).optional(),
+});
+
+function normalizePreviewMatch(match: z.infer<typeof previewMatchSchema>): AISearchMatchPayload {
+  return {
+    address: match.address,
+    suburb: match.suburb ?? null,
+    state: match.state || "NSW",
+    postcode: match.postcode ?? null,
+    propertyType: match.propertyType ?? null,
+    bedrooms: match.bedrooms ?? null,
+    bathrooms: match.bathrooms ?? null,
+    parking: match.parking ?? null,
+    landSizeM2: match.landSizeM2 ?? null,
+    price: match.price ?? null,
+    priceDisplay: match.priceDisplay ?? null,
+    daysOnMarket: match.daysOnMarket ?? null,
+    listingStatus: match.listingStatus ?? "active",
+    listingUrl: match.listingUrl ?? null,
+    score: match.score ?? 0,
+    scoreBreakdown: match.scoreBreakdown ?? {},
+    liamNote: match.liamNote ?? null,
+    rawJson: match.rawJson ?? {},
+    status: match.status ?? "new",
+  };
 }
 
 function slugify(value: string): string {
@@ -213,30 +299,9 @@ export const appRouter = router({
       .input(briefInputSchema)
       .mutation(async ({ input, ctx }) => {
         const user = ensureCurrentUser(ctx);
-        const parsedBudget = parseBudget(input.budget ?? input.budgetDisplay);
         const brief = await createBrief({
           userId: user.id,
-          suburbs: normalizeSuburbs(input),
-          type: input.propertyType || input.type || null,
-          beds: input.beds || null,
-          baths: input.baths || null,
-          parking: input.parking || null,
-          budget: parsedBudget,
-          budgetDisplay: makeBudgetDisplay(input.budgetDisplay ?? input.budget, parsedBudget),
-          purchaseIntent: input.intent || input.purchaseIntent || "live",
-          flex: input.flex || null,
-          radiusKm: input.radiusKm ?? null,
-          nonNegotiables: normalizeList(input.nonNegotiables),
-          needs: normalizeList(input.needs),
-          wants: normalizeList(input.wants),
-          niceToHaves: normalizeList(input.niceToHaves),
-          story: input.buyerStory || input.story || null,
-          finance: input.financeStatus || input.finance || null,
-          financeStatus: input.financeStatus || input.finance || null,
-          timeline: input.timeline || null,
-          landMinM2: input.landMinM2 ?? null,
-          status: "active",
-          tier: "free",
+          ...buildBriefRecord(input),
         });
 
         if (!brief) {
@@ -293,6 +358,29 @@ export const appRouter = router({
   }),
 
   search: router({
+    preview: publicProcedure
+      .input(briefInputSchema)
+      .mutation(async ({ input }) => {
+        const brief = makePreviewBrief(input);
+        const matches = await generateAISearchMatchesForBrief(brief);
+        return { success: true, brief, matches };
+      }),
+
+    savePreview: protectedProcedure
+      .input(z.object({
+        briefId: z.number().int().positive(),
+        matches: z.array(previewMatchSchema).min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = ensureCurrentUser(ctx);
+        const brief = await getBriefById(input.briefId, user.id);
+        if (!brief) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Brief not found" });
+        }
+        const matches = await saveAISearchMatchesForBrief(brief, input.matches.map(normalizePreviewMatch));
+        return { success: true, brief, matches };
+      }),
+
     run: protectedProcedure
       .input(z.object({ briefId: z.number().int().positive().optional() }).optional())
       .mutation(async ({ input, ctx }) => {

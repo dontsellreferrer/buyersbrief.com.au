@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { trpc } from '@/lib/trpc';
@@ -30,6 +30,30 @@ type SignupFormData = {
   password: string;
 };
 
+type PreviewMatch = {
+  address: string;
+  suburb?: string | null;
+  state?: string | null;
+  postcode?: string | null;
+  propertyType?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  parking?: string | null;
+  landSizeM2?: number | null;
+  price?: number | null;
+  priceDisplay?: string | null;
+  daysOnMarket?: number | null;
+  listingStatus?: 'active' | 'price_drop' | 'under_offer' | 'off_market' | 'sold';
+  listingUrl?: string | null;
+  score?: number;
+  scoreBreakdown?: Record<string, unknown> | null;
+  liamNote?: string | null;
+  rawJson?: Record<string, unknown> | null;
+  status?: 'new' | 'hotlisted' | 'rejected' | 'purchased';
+};
+
+const PREVIEW_MATCHES_KEY = 'briefPreviewMatches';
+
 const getStoredBrief = (): StoredBriefData | null => {
   const raw = sessionStorage.getItem('briefData') || sessionStorage.getItem('briefBasics');
   if (!raw) return null;
@@ -39,6 +63,23 @@ const getStoredBrief = (): StoredBriefData | null => {
   } catch {
     return null;
   }
+};
+
+const getStoredPreviewMatches = (): PreviewMatch[] => {
+  const raw = sessionStorage.getItem(PREVIEW_MATCHES_KEY);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is PreviewMatch => Boolean(item && typeof item === 'object' && 'address' in item));
+  } catch {
+    return [];
+  }
+};
+
+const setStoredPreviewMatches = (matches: PreviewMatch[]) => {
+  sessionStorage.setItem(PREVIEW_MATCHES_KEY, JSON.stringify(matches));
 };
 
 const hasUsableBrief = (brief: StoredBriefData | null): brief is StoredBriefData => {
@@ -62,7 +103,7 @@ const escapeHtml = (value: string): string => value
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#039;');
 
-const titleCase = (value?: string): string => {
+const titleCase = (value?: string | null): string => {
   if (!value) return '';
   return value
     .replace(/[_-]/g, ' ')
@@ -74,25 +115,40 @@ const compactList = (items: Array<string | undefined | null>): string => items
   .filter(Boolean)
   .join(' · ');
 
+const formatBudget = (brief: StoredBriefData): string => brief.budgetCeiling || brief.budget || '';
+
 const summarizeBrief = (brief: StoredBriefData): string => {
   const area = brief.suburb?.trim() || 'your selected area';
   const beds = brief.beds ? `${brief.beds}+ bed` : '';
   const type = titleCase(brief.propertyType) || 'property';
-  const budget = brief.budgetCeiling || brief.budget || '';
+  const budget = formatBudget(brief);
   return compactList([area, beds, type, budget ? `to ${budget}` : '']);
 };
 
-const featureSummary = (brief: StoredBriefData): string => {
-  const features = [
-    ...(brief.nonNegotiables ?? []),
-    ...(brief.needs ?? []),
-    ...(brief.wants ?? []),
-  ].map((item) => item.trim()).filter(Boolean);
-  return features.length > 0 ? features.slice(0, 3).join(', ') : 'needs, wants, and watch-outs from your saved brief';
+const normalizeIntent = (intent?: string): 'live' | 'invest' | 'both' => {
+  if (intent === 'invest' || intent === 'both') return intent;
+  return 'live';
 };
 
-const hydrateSignupPreview = (navigate: (path: string) => void) => {
-  const brief = getStoredBrief();
+const makeBriefPayload = (brief: StoredBriefData) => ({
+  suburb: brief.suburb ?? '',
+  propertyType: brief.propertyType ?? '',
+  beds: brief.beds ?? '',
+  baths: brief.baths ?? '',
+  parking: brief.parking ?? '',
+  budget: brief.budgetCeiling || brief.budget || '',
+  budgetDisplay: brief.budgetCeiling || brief.budget || '',
+  intent: normalizeIntent(brief.intent),
+  nonNegotiables: brief.nonNegotiables ?? [],
+  needs: brief.needs ?? [],
+  wants: brief.wants ?? [],
+  niceToHaves: brief.niceToHaves ?? [],
+  buyerStory: brief.buyerStory ?? '',
+  timeline: brief.timeline ?? '',
+  financeStatus: brief.financeStatus ?? '',
+});
+
+const renderNoBriefState = (navigate: (path: string) => void) => {
   const stepSub = document.querySelector<HTMLElement>('#step1 .step-left > .step-sub');
   const liamText = document.querySelector<HTMLElement>('#step1 .liam-text');
   const headerText = document.querySelector<HTMLElement>('#step1 .results-header-text');
@@ -103,79 +159,143 @@ const hydrateSignupPreview = (navigate: (path: string) => void) => {
   const cta = document.querySelector<HTMLButtonElement>('#step1 .step-right button.btn-primary');
   const ctaNote = document.querySelector<HTMLElement>('#step1 .btn-note');
 
-  if (!hasUsableBrief(brief)) {
-    if (stepSub) stepSub.textContent = 'There is no saved buyer brief in this browser session yet. Create a brief first so Liam can run a real AI match search against your own criteria.';
-    if (liamText) liamText.textContent = 'I won’t show sample properties here. Build your brief first, then I’ll save it to your account and run the real AI search for your dashboard.';
-    if (headerText) headerText.textContent = 'No saved brief yet';
-    if (headerSub) headerSub.textContent = 'Create a brief to start a real search';
-    if (resultsCount) resultsCount.textContent = '0 found';
-    if (resultsItems) {
-      resultsItems.innerHTML = `
-        <div class="results-item">
-          <div class="results-item-rank">→</div>
-          <div class="results-item-addr">Create your buyer brief to unlock real AI matches</div>
-          <div class="results-item-badge">NO SAMPLE DATA</div>
-          <div class="results-item-price">Pending</div>
-        </div>
-      `;
-    }
-    if (footerText) footerText.textContent = 'Sample properties have been removed. Your results will be generated from your own saved brief.';
-    if (cta) {
-      cta.textContent = 'Create my buyer brief';
-      cta.onclick = () => navigate('/brief');
-    }
-    if (ctaNote) ctaNote.textContent = 'Takes 3 minutes · no demo properties shown';
-    return;
-  }
-
-  const summary = summarizeBrief(brief);
-  const escapedSummary = escapeHtml(summary);
-  const escapedFeatures = escapeHtml(featureSummary(brief));
-  const budget = escapeHtml(brief.budgetCeiling || brief.budget || 'Budget to be confirmed');
-  const typeAndBeds = escapeHtml(compactList([brief.beds ? `${brief.beds}+ bed` : '', titleCase(brief.propertyType) || 'Property']) || 'Property criteria saved');
-
-  if (stepSub) {
-    stepSub.innerHTML = `Based on your saved brief — <strong>${escapedSummary}</strong> — Liam will run the real AI search after your account is created and send the saved matches to your dashboard.`;
-  }
-  if (liamText) {
-    liamText.textContent = 'I have your brief saved. Create your account and I’ll run the AI search against this exact brief, then send you to your dashboard with the real saved matches.';
-  }
-  if (headerText) headerText.textContent = `Your brief · ${summary}`;
-  if (headerSub) headerSub.textContent = 'Ready for live AI search after signup';
-  if (resultsCount) resultsCount.textContent = 'Ready';
+  if (stepSub) stepSub.textContent = 'Create a buyer brief first and Liam will run the free search here before you choose whether to activate your account.';
+  if (liamText) liamText.textContent = 'I need your buyer brief before I can search. No signup is required for the free search results.';
+  if (headerText) headerText.textContent = 'No buyer brief found';
+  if (headerSub) headerSub.textContent = 'Start with your criteria to run a free search';
+  if (resultsCount) resultsCount.textContent = '0 found';
   if (resultsItems) {
     resultsItems.innerHTML = `
       <div class="results-item">
-        <div class="results-item-rank">#1</div>
-        <div class="results-item-addr">Search area: ${escapeHtml(brief.suburb || 'Saved area')}</div>
-        <div class="results-item-badge">BRIEF READY</div>
-        <div class="results-item-price">${budget}</div>
-      </div>
-      <div class="results-item">
-        <div class="results-item-rank">#2</div>
-        <div class="results-item-addr">Hard filters: ${escapedFeatures}</div>
-        <div class="results-item-badge" style="background:rgba(76,175,125,0.12);color:var(--green);">CRITERIA</div>
-        <div class="results-item-price">${typeAndBeds}</div>
-      </div>
-      <div class="results-item">
-        <div class="results-item-rank">#3</div>
-        <div class="results-item-addr">Dashboard matches will be generated and saved after signup</div>
-        <div class="results-item-badge">AI SEARCH</div>
-        <div class="results-item-price">Pending</div>
+        <div class="results-item-rank">→</div>
+        <div class="results-item-addr">Create your buyer brief to run Liam's free search</div>
+        <div class="results-item-badge">START BRIEF</div>
+        <div class="results-item-price">Free</div>
       </div>
     `;
   }
-  if (footerText) footerText.textContent = 'No sample properties shown. Your dashboard will populate from the live AI search after account creation.';
+  if (footerText) footerText.textContent = 'Your free search results will appear on this page before signup.';
   if (cta) {
-    cta.innerHTML = 'Activate my brief <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    cta.onclick = () => (window as any).goStep(2);
+    cta.textContent = 'Create my buyer brief';
+    cta.onclick = () => navigate('/brief');
   }
-  if (ctaNote) ctaNote.textContent = 'Takes 2 minutes · real search runs after signup';
+  if (ctaNote) ctaNote.textContent = 'Free search first · signup only if you want the dashboard';
 };
 
-const normalizeIntent = (intent?: string): 'live' | 'invest' | 'both' => {
-  if (intent === 'invest' || intent === 'both') return intent;
-  return 'live';
+const renderPreviewLoading = (brief: StoredBriefData) => {
+  const summary = summarizeBrief(brief);
+  const stepSub = document.querySelector<HTMLElement>('#step1 .step-left > .step-sub');
+  const liamText = document.querySelector<HTMLElement>('#step1 .liam-text');
+  const headerText = document.querySelector<HTMLElement>('#step1 .results-header-text');
+  const headerSub = document.querySelector<HTMLElement>('#step1 .results-header-sub');
+  const resultsCount = document.querySelector<HTMLElement>('#step1 .results-count');
+  const resultsItems = document.querySelector<HTMLElement>('#step1 .results-items');
+  const footerText = document.querySelector<HTMLElement>('#step1 .results-footer-text');
+
+  if (stepSub) stepSub.innerHTML = `Based on your brief — <strong>${escapeHtml(summary)}</strong> — Liam is running your free search now.`;
+  if (liamText) liamText.textContent = 'Searching against your buyer criteria now. You do not need to sign up to see these results.';
+  if (headerText) headerText.textContent = `Your brief · ${summary}`;
+  if (headerSub) headerSub.textContent = 'Running free API search now';
+  if (resultsCount) resultsCount.textContent = 'Searching';
+  if (resultsItems) {
+    resultsItems.innerHTML = [1, 2, 3].map((rank) => `
+      <div class="results-item">
+        <div class="results-item-rank">#${rank}</div>
+        <div class="results-item-addr">Searching for a real match…</div>
+        <div class="results-item-badge">API SEARCH</div>
+        <div class="results-item-price">Loading</div>
+      </div>
+    `).join('');
+  }
+  if (footerText) footerText.textContent = 'Live search in progress · results will be saved to your dashboard only if you sign up.';
+};
+
+const renderPreviewError = (brief: StoredBriefData, message: string) => {
+  const liamText = document.querySelector<HTMLElement>('#step1 .liam-text');
+  const headerSub = document.querySelector<HTMLElement>('#step1 .results-header-sub');
+  const resultsCount = document.querySelector<HTMLElement>('#step1 .results-count');
+  const resultsItems = document.querySelector<HTMLElement>('#step1 .results-items');
+  const footerText = document.querySelector<HTMLElement>('#step1 .results-footer-text');
+
+  if (liamText) liamText.textContent = 'I could not complete the free search just now. Please try again in a moment.';
+  if (headerSub) headerSub.textContent = 'Free search failed';
+  if (resultsCount) resultsCount.textContent = '0 found';
+  if (resultsItems) {
+    resultsItems.innerHTML = `
+      <div class="results-item">
+        <div class="results-item-rank">!</div>
+        <div class="results-item-addr">${escapeHtml(message || `Could not search ${summarizeBrief(brief)}`)}</div>
+        <div class="results-item-badge">RETRY</div>
+        <div class="results-item-price">—</div>
+      </div>
+    `;
+  }
+  if (footerText) footerText.textContent = 'No sample results are shown. Refresh to retry the free API search.';
+};
+
+const matchAddress = (match: PreviewMatch): string => {
+  return compactList([
+    match.address,
+    match.suburb || undefined,
+    match.state || undefined,
+  ]) || 'Matched property';
+};
+
+const matchBadge = (match: PreviewMatch, index: number): string => {
+  if (index === 0) return 'BEST MATCH';
+  if (match.listingStatus === 'price_drop') return '↓ PRICE DROP';
+  if (match.listingStatus === 'off_market') return 'OFF MARKET';
+  if ((match.score ?? 0) >= 85) return 'STRONG MATCH';
+  return 'MATCH';
+};
+
+const renderPreviewMatches = (brief: StoredBriefData, matches: PreviewMatch[]) => {
+  const summary = summarizeBrief(brief);
+  const count = matches.length;
+  const visibleMatches = matches.slice(0, 3);
+  const hiddenCount = Math.max(0, count - visibleMatches.length);
+  const stepSub = document.querySelector<HTMLElement>('#step1 .step-left > .step-sub');
+  const liamText = document.querySelector<HTMLElement>('#step1 .liam-text');
+  const headerText = document.querySelector<HTMLElement>('#step1 .results-header-text');
+  const headerSub = document.querySelector<HTMLElement>('#step1 .results-header-sub');
+  const resultsCount = document.querySelector<HTMLElement>('#step1 .results-count');
+  const resultsItems = document.querySelector<HTMLElement>('#step1 .results-items');
+  const footerText = document.querySelector<HTMLElement>('#step1 .results-footer-text');
+  const ctaNote = document.querySelector<HTMLElement>('#step1 .btn-note');
+
+  if (stepSub) stepSub.innerHTML = `Based on your brief — <strong>${escapeHtml(summary)}</strong> — here are Liam's free API search results.`;
+  if (liamText) {
+    liamText.innerHTML = `Found <strong>${count} ${count === 1 ? 'property' : 'properties'}</strong> matching your brief. You can inspect these for free now. Activate your brief only if you want them saved into your dashboard and monitored daily.`;
+  }
+  if (headerText) headerText.textContent = `Your brief · ${summary}`;
+  if (headerSub) headerSub.textContent = `Searched today · ${count} ${count === 1 ? 'match' : 'matches'} found`;
+  if (resultsCount) resultsCount.textContent = `${count} found`;
+  if (resultsItems) {
+    const cards = visibleMatches.map((match, index) => `
+      <div class="results-item">
+        <div class="results-item-rank">#${index + 1}</div>
+        <div class="results-item-addr">${escapeHtml(matchAddress(match))}</div>
+        <div class="results-item-badge"${match.listingStatus === 'price_drop' ? ' style="background:rgba(76,175,125,0.12);color:var(--green);"' : ''}>${escapeHtml(matchBadge(match, index))}</div>
+        <div class="results-item-price">${escapeHtml(match.priceDisplay || (match.price ? `$${Math.round(match.price).toLocaleString('en-AU')}` : 'POA'))}</div>
+      </div>
+    `);
+
+    const blurred = Array.from({ length: Math.min(2, hiddenCount) }).map((_, index) => `
+      <div class="results-blur">
+        <div class="results-item-rank">#${visibleMatches.length + index + 1}</div>
+        <div class="results-item-addr">████████████████████</div>
+        <div class="results-item-price">$███,000</div>
+      </div>
+    `);
+
+    resultsItems.innerHTML = [...cards, ...blurred].join('');
+  }
+  if (footerText) {
+    footerText.textContent = hiddenCount > 0
+      ? `+ ${hiddenCount} more ${hiddenCount === 1 ? 'match' : 'matches'} · activate your brief to save all results to your dashboard`
+      : 'Activate your brief to save these results to your dashboard and monitor them daily';
+  }
+  if (ctaNote) ctaNote.textContent = 'Free results shown · signup only saves them to your dashboard';
 };
 
 const extractSignupForm = (): SignupFormData => {
@@ -239,9 +359,52 @@ export default function Signup() {
   const { user } = useAuth();
   const signup = trpc.auth.signup.useMutation();
   const createBrief = trpc.brief.create.useMutation();
+  const previewSearch = trpc.search.preview.useMutation();
+  const savePreview = trpc.search.savePreview.useMutation();
   const runSearch = trpc.search.run.useMutation();
   const utils = trpc.useUtils();
-  const replayStarted = useRef(false);
+  const signupStarted = useRef(false);
+  const previewStarted = useRef(false);
+  const previewPromise = useRef<Promise<PreviewMatch[]> | null>(null);
+
+  useLayoutEffect(() => {
+    const briefData = getStoredBrief();
+    if (!hasUsableBrief(briefData)) {
+      renderNoBriefState(navigate);
+      return;
+    }
+
+    const existing = getStoredPreviewMatches();
+    if (existing.length > 0) {
+      renderPreviewMatches(briefData, existing);
+      return;
+    }
+
+    if (previewStarted.current) {
+      renderPreviewLoading(briefData);
+    }
+  });
+
+  const runFreePreviewSearch = async (): Promise<PreviewMatch[]> => {
+    const briefData = getStoredBrief();
+    if (!hasUsableBrief(briefData)) {
+      renderNoBriefState(navigate);
+      return [];
+    }
+
+    const existing = getStoredPreviewMatches();
+    if (existing.length > 0) {
+      renderPreviewMatches(briefData, existing);
+      return existing;
+    }
+
+    renderPreviewLoading(briefData);
+    const response = await previewSearch.mutateAsync(makeBriefPayload(briefData));
+    const matches = response.matches as PreviewMatch[];
+    setStoredPreviewMatches(matches);
+    renderPreviewMatches(briefData, matches);
+    return matches;
+  };
 
   const replayStoredBrief = async () => {
     const briefData = getStoredBrief();
@@ -250,49 +413,48 @@ export default function Signup() {
       return;
     }
 
-    const saved = await createBrief.mutateAsync({
-      suburb: briefData.suburb ?? '',
-      propertyType: briefData.propertyType ?? '',
-      beds: briefData.beds ?? '',
-      baths: briefData.baths ?? '',
-      parking: briefData.parking ?? '',
-      budget: briefData.budgetCeiling || briefData.budget || '',
-      budgetDisplay: briefData.budgetCeiling || briefData.budget || '',
-      intent: normalizeIntent(briefData.intent),
-      nonNegotiables: briefData.nonNegotiables ?? [],
-      needs: briefData.needs ?? [],
-      wants: briefData.wants ?? [],
-      niceToHaves: briefData.niceToHaves ?? [],
-      buyerStory: briefData.buyerStory ?? '',
-      timeline: briefData.timeline ?? '',
-      financeStatus: briefData.financeStatus ?? '',
-    });
+    const saved = await createBrief.mutateAsync(makeBriefPayload(briefData));
+    const previewMatches = getStoredPreviewMatches();
 
-    setSignupBusy(true, 'Liam is preparing your dashboard…');
+    setSignupBusy(true, previewMatches.length > 0 ? 'Saving your free search results…' : 'Liam is preparing your dashboard…');
     try {
-      await runSearch.mutateAsync({ briefId: saved.brief.id });
+      if (previewMatches.length > 0) {
+        await savePreview.mutateAsync({ briefId: saved.brief.id, matches: previewMatches });
+      } else {
+        await runSearch.mutateAsync({ briefId: saved.brief.id });
+      }
     } catch (error) {
-      console.warn('[Signup] Search generation failed after brief save; continuing to dashboard', error);
+      console.warn('[Signup] Search result persistence failed after brief save; continuing to dashboard', error);
     }
     sessionStorage.removeItem('briefData');
     sessionStorage.removeItem('briefBasics');
+    sessionStorage.removeItem(PREVIEW_MATCHES_KEY);
     await utils.auth.me.invalidate();
     navigate('/dashboard');
   };
 
   useEffect(() => {
-    if (!user || replayStarted.current) return;
-    replayStarted.current = true;
+    if (!user || signupStarted.current) return;
+    signupStarted.current = true;
 
     replayStoredBrief().catch((error) => {
       console.error('[Signup] Failed to replay stored brief for signed-in user', error);
       showSignupError(error instanceof Error ? error.message : 'We could not create your match report. Please try again.');
-      replayStarted.current = false;
+      signupStarted.current = false;
     });
   }, [user]);
 
   useEffect(() => {
-    hydrateSignupPreview(navigate);
+    if (!previewStarted.current) {
+      previewStarted.current = true;
+      previewPromise.current = runFreePreviewSearch().catch((error) => {
+        const briefData = getStoredBrief();
+        if (hasUsableBrief(briefData)) {
+          renderPreviewError(briefData, error instanceof Error ? error.message : 'Free search failed');
+        }
+        throw error;
+      });
+    }
 
     const showStep = (n: number) => {
       document.querySelectorAll('.step-page').forEach(p => p.classList.remove('active'));
@@ -315,22 +477,23 @@ export default function Signup() {
     };
 
     const completeSignupAndBrief = async () => {
-      if (replayStarted.current) return;
+      if (signupStarted.current) return;
       showSignupError(null);
 
       try {
-        replayStarted.current = true;
+        signupStarted.current = true;
         const form = extractSignupForm();
         setSignupBusy(true, 'Creating account…');
+        await previewPromise.current?.catch(() => []);
         await signup.mutateAsync(form);
         await utils.auth.me.invalidate();
-        setSignupBusy(true, 'Saving your brief…');
+        setSignupBusy(true, 'Saving your brief and results…');
         await replayStoredBrief();
       } catch (error) {
         console.error('[Signup] Failed to complete signup handoff', error);
         showSignupError(error instanceof Error ? error.message : 'We could not finish signup. Please check your details and try again.');
         setSignupBusy(false);
-        replayStarted.current = false;
+        signupStarted.current = false;
       }
     };
 
