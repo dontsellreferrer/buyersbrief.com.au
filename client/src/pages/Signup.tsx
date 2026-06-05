@@ -434,17 +434,6 @@ export default function Signup() {
   };
 
   useEffect(() => {
-    if (!user || signupStarted.current) return;
-    signupStarted.current = true;
-
-    replayStoredBrief().catch((error) => {
-      console.error('[Signup] Failed to replay stored brief for signed-in user', error);
-      showSignupError(error instanceof Error ? error.message : 'We could not create your match report. Please try again.');
-      signupStarted.current = false;
-    });
-  }, [user]);
-
-  useEffect(() => {
     if (!previewStarted.current) {
       previewStarted.current = true;
       previewPromise.current = runFreePreviewSearch().catch((error) => {
@@ -482,11 +471,15 @@ export default function Signup() {
 
       try {
         signupStarted.current = true;
-        const form = extractSignupForm();
-        setSignupBusy(true, 'Creating account…');
         await previewPromise.current?.catch(() => []);
-        await signup.mutateAsync(form);
-        await utils.auth.me.invalidate();
+
+        if (!user) {
+          const form = extractSignupForm();
+          setSignupBusy(true, 'Creating account…');
+          await signup.mutateAsync(form);
+          await utils.auth.me.invalidate();
+        }
+
         setSignupBusy(true, 'Saving your brief and results…');
         await replayStoredBrief();
       } catch (error) {
@@ -559,7 +552,7 @@ export default function Signup() {
 
     (window as any).currentStep = 1;
     (window as any).selectedPathType = null;
-  }, [signup, utils, navigate]);
+  }, [signup, utils, navigate, user]);
 
   return (
     <div dangerouslySetInnerHTML={{ __html: signupHTML }} />
