@@ -7,6 +7,7 @@ import dashboardHtml from './dashboard.html?raw';
 type TemplateCache = {
   matchCard?: HTMLElement;
   hotlistCard?: HTMLElement;
+  hotlistCards?: HTMLElement[];
 };
 
 const dashboardRenderableHtml = extractRenderableDashboardHtml(dashboardHtml);
@@ -62,6 +63,14 @@ function setDisplayed(element: Element | null | undefined, shouldDisplay: boolea
   }
 }
 
+function cacheOriginalInlineHandlers(scope: ParentNode) {
+  scope.querySelectorAll<HTMLElement>('[onclick]').forEach((element) => {
+    if (!element.dataset.originalOnclick) {
+      element.dataset.originalOnclick = element.getAttribute('onclick') || '';
+    }
+  });
+}
+
 function removeInlineHandlers(scope: ParentNode) {
   scope.querySelectorAll<HTMLElement>('[onclick]').forEach((element) => element.removeAttribute('onclick'));
 }
@@ -79,10 +88,109 @@ function scoreColour(score: number) {
   return '#E8614A';
 }
 
+function normaliseCmaPath(value: unknown) {
+  const raw = textValue(value, '');
+  if (!raw) return null;
+  if (raw.startsWith('/')) return raw;
+  try {
+    const url = new URL(raw);
+    if (url.hostname === 'buyersbrief.com.au' || url.hostname.endsWith('.buyersbrief.com.au')) {
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch {
+    return raw;
+  }
+  return raw;
+}
+
 function cmaPath(cma: any) {
+  if (cma?.url) return normaliseCmaPath(cma.url);
   if (cma?.suburbSlug && cma?.addressSlug) return `/cma/${cma.suburbSlug}/${cma.addressSlug}`;
   if (cma?.id) return `/cma/${cma.id}`;
   return null;
+}
+
+function cmaPathFromButton(button: HTMLElement | null | undefined) {
+  if (!button) return null;
+  const originalOnclick = button.dataset.originalOnclick || button.getAttribute('onclick') || '';
+  const hrefMatch = originalOnclick.match(/window\.location\.href\s*=\s*['"]([^'"]+)['"]/i);
+  if (hrefMatch?.[1]) return normaliseCmaPath(hrefMatch[1]);
+  const runMatch = originalOnclick.match(/runCMA\(\s*['"]([^'"]+)['"]\s*\)/i);
+  if (runMatch?.[1]) return normaliseCmaPath(runMatch[1]);
+  return null;
+}
+
+function inferHotlistStatus(card: HTMLElement) {
+  if (card.classList.contains('status-sold')) return 'sold';
+  if (card.classList.contains('status-offer')) return 'under_offer';
+  if (card.classList.contains('status-stale')) return 'stale';
+  return 'active';
+}
+
+function staticHotlistRowFromTemplate(template: HTMLElement, index: number) {
+  const cmaButton = template.querySelector<HTMLElement>('.btn-cma');
+  const cmaRunButton = template.querySelector<HTMLElement>('.cma-run');
+  const cmaUrl = cmaPathFromButton(cmaButton) || cmaPathFromButton(cmaRunButton);
+  const buttonText = `${cmaButton?.textContent || ''} ${cmaRunButton?.textContent || ''}`;
+  const hasViewCma = /view cma/i.test(buttonText) && !!cmaUrl;
+
+  return {
+    __static: true,
+    template,
+    cmaUrl,
+    match: {
+      id: -(index + 1),
+      address: textValue(template.querySelector<HTMLElement>('.hotlist-addr')?.textContent, 'Selected property'),
+      priceDisplay: textValue(template.querySelector<HTMLElement>('.hotlist-price')?.textContent, ''),
+      bedrooms: '—',
+      bathrooms: '—',
+      parking: 'Parking TBC',
+      score: 0,
+    },
+    hotlist: {
+      id: -(index + 1),
+      matchId: -(index + 1),
+      status: inferHotlistStatus(template),
+      inspectionNote: '',
+    },
+    cma: hasViewCma ? { url: cmaUrl } : null,
+  };
+}
+
+function showCmaOverlay(root: ParentNode, cmaUrl: string | null, navigate: (path: string) => void) {
+  const overlay = root.querySelector<HTMLElement>('#cmaOverlay');
+  if (!overlay) {
+    if (cmaUrl) navigate(cmaUrl);
+    return;
+  }
+
+  overlay.classList.add('show');
+  const fill = overlay.querySelector<HTMLElement>('#cmaFill, .cma-fill');
+  const message = overlay.querySelector<HTMLElement>('#cmaMessage, .cma-message');
+  const subMessage = overlay.querySelector<HTMLElement>('#cmaSub, .cma-sub');
+  const steps = [
+    ['Retrieving listing date and property history', 'Fetching listing date and history from property data sources...'],
+    ['Reviewing comparable sales', 'Checking similar homes, price movement and buyer competition...'],
+    ["Preparing Liam's CMA view", 'Opening the property report as soon as it is ready...'],
+  ];
+
+  let stepIndex = 0;
+  if (fill) fill.style.width = '8%';
+  const interval = window.setInterval(() => {
+    const step = steps[Math.min(stepIndex, steps.length - 1)];
+    if (message) message.textContent = step[0];
+    if (subMessage) subMessage.textContent = step[1];
+    if (fill) fill.style.width = `${Math.min(95, 25 + stepIndex * 30)}%`;
+    stepIndex += 1;
+    if (stepIndex > steps.length) {
+      window.clearInterval(interval);
+      if (fill) fill.style.width = '100%';
+      window.setTimeout(() => {
+        overlay.classList.remove('show');
+        if (cmaUrl) navigate(cmaUrl);
+      }, 350);
+    }
+  }, 450);
 }
 
 export default function Dashboard() {
@@ -150,11 +258,13 @@ export default function Dashboard() {
       const matchTemplate = root.querySelector<HTMLElement>('.match-card');
       if (matchTemplate) templatesRef.current.matchCard = matchTemplate.cloneNode(true) as HTMLElement;
     }
-    if (!templatesRef.current.hotlistCard) {
-      const hotlistTemplate = root.querySelector<HTMLElement>('.hotlist-card');
-      if (hotlistTemplate) templatesRef.current.hotlistCard = hotlistTemplate.cloneNode(true) as HTMLElement;
+    if (!templatesRef.current.hotlistCards) {
+      const hotlistTemplates = Array.from(root.querySelectorAll<HTMLElement>('.hotlist-card'));
+      templatesRef.current.hotlistCards = hotlistTemplates.map((template) => template.cloneNode(true) as HTMLElement);
+      if (hotlistTemplates[0]) templatesRef.current.hotlistCard = hotlistTemplates[0].cloneNode(true) as HTMLElement;
     }
 
+    cacheOriginalInlineHandlers(root);
     removeInlineHandlers(root);
 
     setText(root, '.topbar-title', `Good morning, ${firstName}.`);
@@ -174,9 +284,11 @@ export default function Dashboard() {
     setText(root, '.section-count', matches.length ? `${matches.length} today` : '0 today');
 
     const hotlistCount = root.querySelectorAll<HTMLElement>('.section-count-rose');
-    hotlistCount.forEach((element) => {
-      element.textContent = `${hotlist.length} ${hotlist.length === 1 ? 'property' : 'properties'}`;
-    });
+    if (hotlist.length > 0) {
+      hotlistCount.forEach((element) => {
+        element.textContent = `${hotlist.length} ${hotlist.length === 1 ? 'property' : 'properties'}`;
+      });
+    }
 
     const logoutButton = root.querySelector<HTMLElement>('.user-logout');
     if (logoutButton) {
@@ -296,12 +408,19 @@ export default function Dashboard() {
     }
 
     const hotlistCardsContainer = root.querySelector<HTMLElement>('.hotlist-cards');
-    const hotlistTemplate = templatesRef.current.hotlistCard;
+    const hotlistTemplates = templatesRef.current.hotlistCards || [];
+    const hotlistTemplate = templatesRef.current.hotlistCard || hotlistTemplates[0];
     if (hotlistCardsContainer && hotlistTemplate) {
       hotlistCardsContainer.innerHTML = '';
 
-      if (hotlist.length === 0) {
+      const staticHotlistRows = hotlist.length === 0
+        ? hotlistTemplates.map((template, index) => staticHotlistRowFromTemplate(template, index))
+        : [];
+      const rowsToRender = hotlist.length > 0 ? hotlist : staticHotlistRows;
+
+      if (rowsToRender.length === 0) {
         const emptyCard = hotlistTemplate.cloneNode(true) as HTMLElement;
+        cacheOriginalInlineHandlers(emptyCard);
         removeInlineHandlers(emptyCard);
         emptyCard.className = 'hotlist-card';
         setText(emptyCard, '.hotlist-addr', 'No properties in your hotlist yet');
@@ -314,24 +433,31 @@ export default function Dashboard() {
         setDisplayed(emptyCard.querySelector('.btn-remove'), false);
         hotlistCardsContainer.appendChild(emptyCard);
       } else {
-        hotlist.forEach((row: any, index: number) => {
-          const card = hotlistTemplate.cloneNode(true) as HTMLElement;
+        rowsToRender.forEach((row: any, index: number) => {
+          const isStaticTemplateRow = !!row.__static;
+          const preferredTemplate = isStaticTemplateRow
+            ? row.template
+            : (row.cma ? hotlistTemplates[0] : hotlistTemplates[1]) || hotlistTemplate;
+          const card = (preferredTemplate || hotlistTemplate).cloneNode(true) as HTMLElement;
           const match = row.match || {};
           const hotlistEntry = row.hotlist || {};
-          const inspectId = `inspect-${hotlistEntry.id || index}`;
+          const inspectId = `inspect-${Math.abs(numberValue(hotlistEntry.id, index + 1))}-${index}`;
+          cacheOriginalInlineHandlers(card);
           removeInlineHandlers(card);
 
-          card.className = `hotlist-card${hotlistEntry.status === 'stale' ? ' status-stale' : ''}${hotlistEntry.status === 'under_offer' ? ' status-offer' : ''}${hotlistEntry.status === 'sold' ? ' status-sold' : ''}`;
-          setText(card, '.hotlist-addr', textValue(match.address, 'Property address pending'));
-          setHtml(card, '.hotlist-meta', `${formatMeta(match)} <span class="status-pill ${hotlistEntry.status === 'active' ? 'status-active' : 'status-drop'}">${textValue(hotlistEntry.status, 'ACTIVE').replace('_', ' ').toUpperCase()}</span>`);
-          setHtml(card, '.hotlist-change', `<span class="change-down">${escapeHtml(row.cma ? 'CMA ready' : 'Monitoring')}</span> <span style="color:rgba(127,168,212,0.4);">— added to your hotlist</span>`);
-          setText(card, '.hotlist-price', textValue(match.priceDisplay, money(match.price)));
-          setText(card, '.hotlist-orig', textValue(match.originalPriceDisplay, ''));
+          if (!isStaticTemplateRow) {
+            card.className = `hotlist-card${hotlistEntry.status === 'stale' ? ' status-stale' : ''}${hotlistEntry.status === 'under_offer' ? ' status-offer' : ''}${hotlistEntry.status === 'sold' ? ' status-sold' : ''}`;
+            setText(card, '.hotlist-addr', textValue(match.address, 'Property address pending'));
+            setHtml(card, '.hotlist-meta', `${formatMeta(match)} <span class="status-pill ${hotlistEntry.status === 'active' ? 'status-active' : 'status-drop'}">${textValue(hotlistEntry.status, 'ACTIVE').replace('_', ' ').toUpperCase()}</span>`);
+            setHtml(card, '.hotlist-change', `<span class="change-down">${escapeHtml(row.cma ? 'CMA ready' : 'Monitoring')}</span> <span style="color:rgba(127,168,212,0.4);">— added to your hotlist</span>`);
+            setText(card, '.hotlist-price', textValue(match.priceDisplay, money(match.price)));
+            setText(card, '.hotlist-orig', textValue(match.originalPriceDisplay, ''));
 
-          const cmaValues = card.querySelectorAll<HTMLElement>('.cma-item-value');
-          if (cmaValues[0]) cmaValues[0].textContent = `${numberValue(match.score, 0)}%`;
-          if (cmaValues[1]) cmaValues[1].textContent = textValue(match.priceDisplay, money(match.price));
-          if (cmaValues[2]) cmaValues[2].textContent = row.cma ? 'Ready' : 'Pending';
+            const cmaValues = card.querySelectorAll<HTMLElement>('.cma-item-value');
+            if (cmaValues[0]) cmaValues[0].textContent = `${numberValue(match.score, 0)}%`;
+            if (cmaValues[1]) cmaValues[1].textContent = textValue(match.priceDisplay, money(match.price));
+            if (cmaValues[2]) cmaValues[2].textContent = row.cma ? 'Ready' : 'Pending';
+          }
 
           const inspectPanel = card.querySelector<HTMLElement>('.inspect-panel');
           const inspectTextarea = card.querySelector<HTMLTextAreaElement>('.inspect-textarea');
@@ -343,25 +469,32 @@ export default function Dashboard() {
           if (inspectPanel) inspectPanel.id = inspectId;
           if (inspectTextarea) {
             inspectTextarea.id = `${inspectId}-text`;
-            inspectTextarea.value = textValue(hotlistEntry.inspectionNote, '');
+            if (!isStaticTemplateRow) inspectTextarea.value = textValue(hotlistEntry.inspectionNote, '');
           }
           if (suggestion) suggestion.id = `${inspectId}-suggest`;
           if (suggestionText) suggestionText.id = `${inspectId}-suggest-text`;
           if (savedNote) savedNote.id = `${inspectId}-saved`;
           if (savedNoteText) {
             savedNoteText.id = `${inspectId}-saved-text`;
-            savedNoteText.textContent = textValue(hotlistEntry.inspectionNote, '');
-            savedNote?.classList.toggle('show', !!hotlistEntry.inspectionNote);
+            if (!isStaticTemplateRow) {
+              savedNoteText.textContent = textValue(hotlistEntry.inspectionNote, '');
+              savedNote?.classList.toggle('show', !!hotlistEntry.inspectionNote);
+            }
           }
 
           const inspectButton = card.querySelector<HTMLButtonElement>('.inspect-btn');
-          if (inspectButton) inspectButton.onclick = () => inspectPanel?.classList.toggle('open');
+          if (inspectButton) {
+            inspectButton.onclick = () => {
+              inspectPanel?.classList.toggle('open');
+              inspectButton.style.color = inspectPanel?.classList.contains('open') ? 'var(--sky)' : '';
+            };
+          }
 
           const saveNoteButton = card.querySelector<HTMLButtonElement>('.inspect-save');
           if (saveNoteButton) {
             saveNoteButton.onclick = () => {
               const note = inspectTextarea?.value.trim() || '';
-              updateHotlist.mutate({ id: hotlistEntry.id, inspectionNote: note });
+              if (!isStaticTemplateRow && hotlistEntry.id) updateHotlist.mutate({ id: hotlistEntry.id, inspectionNote: note });
               if (savedNoteText) savedNoteText.textContent = note;
               savedNote?.classList.add('show');
               if (suggestionText) {
@@ -374,24 +507,38 @@ export default function Dashboard() {
           const editNoteButton = card.querySelector<HTMLButtonElement>('.inspect-edit');
           if (editNoteButton) editNoteButton.onclick = () => inspectPanel?.classList.add('open');
 
+          const openProceed = () => openProceedModal(root, row, isStaticTemplateRow ? undefined : updateHotlist.mutate);
           const useSuggestionButton = card.querySelector<HTMLButtonElement>('.suggest-use');
-          if (useSuggestionButton) useSuggestionButton.onclick = () => openProceedModal(root, row, updateHotlist.mutate);
+          if (useSuggestionButton) useSuggestionButton.onclick = openProceed;
 
           const proceedButton = card.querySelector<HTMLButtonElement>('.btn-proceed');
-          if (proceedButton) proceedButton.onclick = () => openProceedModal(root, row, updateHotlist.mutate);
+          if (proceedButton) proceedButton.onclick = openProceed;
 
-          const cmaButton = card.querySelector<HTMLButtonElement>('.btn-cma, .cma-run');
-          if (cmaButton) {
-            cmaButton.textContent = row.cma ? 'View CMA →' : 'Run full CMA';
+          const fallbackCmaPath = cmaPath(row.cma) || row.cmaUrl || cmaPathFromButton(card.querySelector<HTMLElement>('.btn-cma')) || cmaPathFromButton(card.querySelector<HTMLElement>('.cma-run'));
+          card.querySelectorAll<HTMLButtonElement>('.btn-cma, .cma-run').forEach((cmaButton) => {
+            const disabledByDesign = /under offer/i.test(cmaButton.textContent || '') || cmaButton.style.pointerEvents === 'none';
+            if (disabledByDesign) return;
+            const buttonPath = cmaPathFromButton(cmaButton) || fallbackCmaPath;
+            const isViewCma = !!cmaPath(row.cma) || /view cma/i.test(cmaButton.textContent || '');
+            if (!isStaticTemplateRow) cmaButton.textContent = isViewCma ? 'View CMA →' : (cmaButton.classList.contains('cma-run') ? 'Run AI CMA →' : 'Run full CMA');
             cmaButton.onclick = () => {
-              const path = cmaPath(row.cma);
-              if (path) navigate(path);
-              else generateCma.mutate({ hotlistId: hotlistEntry.id, address: match.address, suburb: match.suburb });
+              const path = cmaPath(row.cma) || buttonPath;
+              if (isViewCma && path) navigate(path);
+              else if (isStaticTemplateRow) showCmaOverlay(root, path, navigate);
+              else {
+                showCmaOverlay(root, null, navigate);
+                generateCma.mutate({ hotlistId: hotlistEntry.id, address: match.address, suburb: match.suburb });
+              }
             };
-          }
+          });
 
           const removeButton = card.querySelector<HTMLButtonElement>('.btn-remove');
-          if (removeButton) removeButton.onclick = () => removeHotlist.mutate({ id: hotlistEntry.id });
+          if (removeButton) {
+            removeButton.onclick = () => {
+              if (isStaticTemplateRow) card.remove();
+              else removeHotlist.mutate({ id: hotlistEntry.id });
+            };
+          }
 
           hotlistCardsContainer.appendChild(card);
         });
@@ -475,7 +622,7 @@ export default function Dashboard() {
   return <div ref={containerRef} dangerouslySetInnerHTML={{ __html: dashboardRenderableHtml }} />;
 }
 
-function openProceedModal(root: HTMLElement, row: any, updateHotlist: (input: { id: number; tier3Requested?: boolean; tier3MaxPrice?: number | null; inspectionNote?: string | null }) => void) {
+function openProceedModal(root: HTMLElement, row: any, updateHotlist?: (input: { id: number; tier3Requested?: boolean; tier3MaxPrice?: number | null; inspectionNote?: string | null }) => void) {
   const modalOverlay = root.querySelector<HTMLElement>('#modalOverlay');
   if (!modalOverlay) return;
 
@@ -494,7 +641,7 @@ function openProceedModal(root: HTMLElement, row: any, updateHotlist: (input: { 
     submitButton.onclick = () => {
       const maxInput = modalOverlay.querySelector<HTMLInputElement>('.modal-input');
       const tier3MaxPrice = maxInput?.value ? numberValue(maxInput.value, 0) : null;
-      updateHotlist({ id: hotlistEntry.id, tier3Requested: true, tier3MaxPrice });
+      if (updateHotlist && hotlistEntry.id > 0) updateHotlist({ id: hotlistEntry.id, tier3Requested: true, tier3MaxPrice });
       modalOverlay.querySelectorAll<HTMLElement>('.modal-step').forEach((step) => {
         step.style.display = 'none';
       });
