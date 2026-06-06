@@ -1604,7 +1604,7 @@ body {
           <div class="match-card new-match" id="mc1">
             <div class="match-rank">#1</div>
             <div class="match-info">
-              <div class="match-addr">14 Borehole St, Merewether NSW 2291</div>
+              <div class="match-addr">Verified match pending</div>
               <div class="match-meta">
                 4 bed <span class="meta-dot"></span>
                 2 bath <span class="meta-dot"></span>
@@ -1630,7 +1630,7 @@ body {
               </div>
             </div>
             <div class="match-right">
-              <div class="match-price">$1,050,000</div>
+              <div class="match-price">—</div>
               <div class="match-actions">
                 <button class="btn-add" onclick="addToHotlist(this,'mc1')">+ Hotlist</button>
                 <button class="btn-reject" onclick="rejectMatch('mc1')">Not for me</button>
@@ -1642,7 +1642,7 @@ body {
           <div class="match-card new-match" id="mc2">
             <div class="match-rank">#2</div>
             <div class="match-info">
-              <div class="match-addr">7 Cowper St, Merewether NSW 2291</div>
+              <div class="match-addr">Verified match pending</div>
               <div class="match-meta">
                 3 bed <span class="meta-dot"></span>
                 1 bath <span class="meta-dot"></span>
@@ -1668,7 +1668,7 @@ body {
               </div>
             </div>
             <div class="match-right">
-              <div class="match-price">$895,000</div>
+              <div class="match-price">—</div>
               <div class="match-actions">
                 <button class="btn-add" onclick="addToHotlist(this,'mc2')">+ Hotlist</button>
                 <button class="btn-reject" onclick="rejectMatch('mc2')">Not for me</button>
@@ -1680,7 +1680,7 @@ body {
           <div class="match-card price-drop" id="mc3">
             <div class="match-rank" style="background:rgba(76,175,125,0.12);color:var(--green);">#3</div>
             <div class="match-info">
-              <div class="match-addr">31 Pacific St, Bar Beach NSW 2300</div>
+              <div class="match-addr">Verified match pending</div>
               <div class="match-meta">
                 4 bed <span class="meta-dot"></span>
                 2 bath <span class="meta-dot"></span>
@@ -1706,7 +1706,7 @@ body {
               </div>
             </div>
             <div class="match-right">
-              <div class="match-price">$1,099,000</div>
+              <div class="match-price">—</div>
               <div class="match-actions">
                 <button class="btn-add" onclick="addToHotlist(this,'mc3')">+ Hotlist</button>
                 <button class="btn-reject" onclick="rejectMatch('mc3')">Not for me</button>
@@ -1807,7 +1807,7 @@ body {
                 <label class="inspect-label">Inspection notes</label>
                 <textarea class="inspect-textarea" id="insp1-text" placeholder="What did you think? Loved the light, bathroom needs work, neighbour seemed loud... Liam will read this and suggest a position."></textarea>
                 <div class="inspect-actions">
-                  <button class="inspect-save" onclick="saveNote('insp1','22 Scenic Dr','$1,050,000')">Save note — ask Liam</button>
+                  <button class="inspect-save" onclick="saveNote('insp1','22 Scenic Dr','—')">Save note — ask Liam</button>
                   <span class="inspect-hint">Liam will respond with a suggested offer</span>
                 </div>
                 <div class="liam-suggestion" id="insp1-suggest">
@@ -1824,11 +1824,11 @@ body {
             </div><!-- end hotlist-left-col -->
             <div class="hotlist-right" id="h1-right">
               <div>
-                <div class="hotlist-price">$1,050,000</div>
+                <div class="hotlist-price">—</div>
                 <div class="hotlist-orig">$1,075,000</div>
               </div>
               <div class="hotlist-actions" style="flex-direction:column;gap:5px;">
-                <button class="btn-proceed" id="h1-proceed" onclick="openModal('proceed','22 Scenic Dr, Merewether NSW 2291','$1,050,000','insp1')">Wanna buy this one?</button>
+                <button class="btn-proceed" id="h1-proceed" onclick="openModal('proceed','22 Scenic Dr, Merewether NSW 2291','—','insp1')">Wanna buy this one?</button>
                 <!-- DEV NOTE: CMA URL pattern → /cma/[suburb-slug]/[address-slug] e.g. /cma/morisset-park/2-havilah-street -->
                 <button class="btn-cma" onclick="window.location.href='https://buyersbrief.com.au/cma/2_Havilah_Street_Morisset_Park'">View CMA →</button>
                 <button class="btn-remove">Remove</button>
@@ -2287,9 +2287,9 @@ function addToHotlist(btn, cardId) {
 
   // Add a new card to hotlist
   const addresses = {
-    mc1: { addr:'14 Borehole St, Merewether NSW 2291', meta:'4 bed · 2 bath · Double garage + side access', price:'$1,050,000' },
-    mc2: { addr:'7 Cowper St, Merewether NSW 2291', meta:'3 bed · 1 bath · Single garage', price:'$895,000' },
-    mc3: { addr:'31 Pacific St, Bar Beach NSW 2300', meta:'4 bed · 2 bath · Double carport + workshop', price:'$1,099,000' },
+    mc1: { addr:'Verified match pending', meta:'4 bed · 2 bath · Double garage + side access', price:'—' },
+    mc2: { addr:'Verified match pending', meta:'3 bed · 1 bath · Single garage', price:'—' },
+    mc3: { addr:'Verified match pending', meta:'4 bed · 2 bath · Double carport + workshop', price:'—' },
     mc4: { addr:'Off-market · Merewether area', meta:'4 bed · 2 bath · Details on request', price:'POA' },
   };
   const p = addresses[cardId];

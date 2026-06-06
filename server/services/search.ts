@@ -97,7 +97,12 @@ function briefToPrompt(brief: Brief): string {
 }
 
 function toInsertMatch(match: GeneratedMatch): AISearchMatchPayload {
-  const rawJson = match as unknown as Record<string, unknown>;
+  const rawJson = {
+    ...(match as unknown as Record<string, unknown>),
+    _buyersbriefSource: "anthropic_verified_source_only",
+    _buyersbriefProvider: "anthropic",
+    _verifiedSourceRecordsRequired: true,
+  };
   return {
     address: match.address,
     suburb: match.suburb || null,
@@ -126,11 +131,12 @@ export async function generateAISearchMatchesForBrief(brief: Brief): Promise<AIS
 
   const result = await invokeLLM({
     maxTokens: 4096,
+    requireAnthropic: true,
     responseFormat: { type: "json_object" },
     messages: [
       {
         role: "system",
-        content: `You are Liam, the BuyersBrief property matching analyst for Australian residential buyers. Generate a concise candidate match report for dashboard testing and buyer triage. Use realistic Australian property data patterns, keep all prices within or near the stated budget unless explicitly justified, respect non-negotiables as hard filters, and score each match from 0 to 100. If live listing URLs are unknown, leave listingUrl null rather than inventing a real URL. Return exactly this JSON object shape: {"matches":[{"address":"string","suburb":"string","state":"NSW|VIC|QLD|SA|WA|TAS|ACT|NT","postcode":"string","propertyType":"string","bedrooms":number,"bathrooms":number,"parking":"string","landSizeM2":number|null,"price":number|null,"priceDisplay":"string","daysOnMarket":number,"listingStatus":"active|price_drop|under_offer|off_market","listingUrl":string|null,"score":number,"scoreBreakdown":{"needsMet":["string"],"needsMissed":["string"],"wantsMet":["string"],"wantsMissed":["string"],"niceToHavesMet":["string"],"nnFlags":["string"],"rationale":"string"},"liamNote":"string"}]}. Return 3 to 5 matches.`,
+        content: `You are Liam, the BuyersBrief property matching analyst for Australian residential buyers. You must not invent, synthesize, approximate, or fabricate property listings, addresses, prices, days-on-market, listing statuses, or listing URLs. Only return matches from verified listing source records supplied by the application in the user payload. If no verified listing source records are supplied, return exactly {"matches":[]} rather than creating plausible-looking properties. Respect non-negotiables as hard filters and score each returned verified listing from 0 to 100. Return exactly this JSON object shape: {"matches":[{"address":"string","suburb":"string","state":"NSW|VIC|QLD|SA|WA|TAS|ACT|NT","postcode":"string","propertyType":"string","bedrooms":number,"bathrooms":number,"parking":"string","landSizeM2":number|null,"price":number|null,"priceDisplay":"string","daysOnMarket":number,"listingStatus":"active|price_drop|under_offer|off_market","listingUrl":string|null,"score":number,"scoreBreakdown":{"needsMet":["string"],"needsMissed":["string"],"wantsMet":["string"],"wantsMissed":["string"],"niceToHavesMet":["string"],"nnFlags":["string"],"rationale":"string"},"liamNote":"string"}]}. please output .json file only - no other output required.`,
       },
       {
         role: "user",
@@ -145,7 +151,7 @@ export async function generateAISearchMatchesForBrief(brief: Brief): Promise<AIS
   const validMatches = parsed.matches.filter((match) => match.address && match.address.trim().length > 0);
 
   if (validMatches.length === 0) {
-    throw new Error("AI search returned no usable matches");
+    throw new Error("No verified property matches were returned. The brief search now requires Anthropic plus verified listing source records; synthetic or template properties are not displayed.");
   }
 
   return validMatches.map(toInsertMatch);

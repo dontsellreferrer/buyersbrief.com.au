@@ -75,6 +75,7 @@ export type InvokeParams = {
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
   model?: string;
+  requireAnthropic?: boolean;
 };
 
 export type ToolCall = {
@@ -310,6 +311,10 @@ async function invokeAnthropic(params: InvokeParams, responseFormat?: ResponseFo
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const responseFormat = normalizeResponseFormat(params);
+
+  if (params.requireAnthropic) {
+    return invokeAnthropic(params, responseFormat);
+  }
 
   if (process.env.ANTHROPIC_API_KEY) {
     try {

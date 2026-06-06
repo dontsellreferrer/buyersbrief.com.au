@@ -65,6 +65,17 @@ const getStoredBrief = (): StoredBriefData | null => {
   }
 };
 
+const isTrustedPreviewMatch = (item: unknown): item is PreviewMatch => {
+  if (!item || typeof item !== 'object' || !('address' in item)) return false;
+  const rawJson = (item as PreviewMatch).rawJson;
+  return Boolean(
+    rawJson &&
+    rawJson._buyersbriefSource === 'anthropic_verified_source_only' &&
+    rawJson._buyersbriefProvider === 'anthropic' &&
+    rawJson._verifiedSourceRecordsRequired === true
+  );
+};
+
 const getStoredPreviewMatches = (): PreviewMatch[] => {
   const raw = sessionStorage.getItem(PREVIEW_MATCHES_KEY);
   if (!raw) return [];
@@ -72,14 +83,25 @@ const getStoredPreviewMatches = (): PreviewMatch[] => {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is PreviewMatch => Boolean(item && typeof item === 'object' && 'address' in item));
+    const trusted = parsed.filter(isTrustedPreviewMatch);
+    if (trusted.length !== parsed.length) {
+      sessionStorage.removeItem(PREVIEW_MATCHES_KEY);
+      return [];
+    }
+    return trusted;
   } catch {
+    sessionStorage.removeItem(PREVIEW_MATCHES_KEY);
     return [];
   }
 };
 
 const setStoredPreviewMatches = (matches: PreviewMatch[]) => {
-  sessionStorage.setItem(PREVIEW_MATCHES_KEY, JSON.stringify(matches));
+  const trusted = matches.filter(isTrustedPreviewMatch);
+  if (trusted.length === 0) {
+    sessionStorage.removeItem(PREVIEW_MATCHES_KEY);
+    return;
+  }
+  sessionStorage.setItem(PREVIEW_MATCHES_KEY, JSON.stringify(trusted));
 };
 
 const hasUsableBrief = (brief: StoredBriefData | null): brief is StoredBriefData => {
@@ -400,8 +422,11 @@ export default function Signup() {
 
     renderPreviewLoading(briefData);
     const response = await previewSearch.mutateAsync(makeBriefPayload(briefData));
-    const matches = response.matches as PreviewMatch[];
+    const matches = (response.matches as PreviewMatch[]).filter(isTrustedPreviewMatch);
     setStoredPreviewMatches(matches);
+    if (matches.length === 0) {
+      throw new Error('No verified Anthropic property matches were returned. Synthetic preview results are blocked.');
+    }
     renderPreviewMatches(briefData, matches);
     return matches;
   };

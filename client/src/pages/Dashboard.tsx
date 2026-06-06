@@ -157,6 +157,36 @@ function staticHotlistRowFromTemplate(template: HTMLElement, index: number) {
   };
 }
 
+function neutraliseStaticHotlistCard(card: HTMLElement, index: number) {
+  card.className = `hotlist-card static-hotlist-placeholder${index > 0 ? ' status-stale' : ''}`;
+  setText(card, '.hotlist-addr', index === 0 ? 'Hotlist ready for verified properties' : 'Verified property slot');
+  setHtml(card, '.hotlist-meta', 'Add a verified match from the Matches section <span class="status-pill status-active">WAITING</span>');
+  setHtml(card, '.hotlist-change', '<span class="change-down">No verified property data loaded</span> <span style="color:rgba(127,168,212,0.4);">— nothing synthetic is shown</span>');
+  setText(card, '.hotlist-price', '—');
+  setText(card, '.hotlist-orig', '');
+
+  const cmaValues = card.querySelectorAll<HTMLElement>('.cma-item-value');
+  if (cmaValues[0]) cmaValues[0].textContent = 'Waiting';
+  if (cmaValues[1]) cmaValues[1].textContent = 'Verified data required';
+  if (cmaValues[2]) cmaValues[2].textContent = 'Not available';
+
+  card.querySelectorAll<HTMLButtonElement>('.btn-cma, .cma-run').forEach((button) => {
+    button.textContent = 'CMA after verified hotlist';
+    button.disabled = true;
+    button.setAttribute('aria-disabled', 'true');
+    button.style.pointerEvents = 'none';
+    button.style.opacity = '0.55';
+  });
+
+  card.querySelectorAll<HTMLButtonElement>('.btn-proceed, .suggest-use').forEach((button) => {
+    button.textContent = button.classList.contains('btn-proceed') ? 'Add match first' : 'Use after verified match';
+    button.disabled = true;
+    button.setAttribute('aria-disabled', 'true');
+    button.style.pointerEvents = 'none';
+    button.style.opacity = '0.55';
+  });
+}
+
 function showCmaOverlay(root: ParentNode, cmaUrl: string | null, navigate: (path: string) => void) {
   const overlay = root.querySelector<HTMLElement>('#cmaOverlay');
   if (!overlay) {
@@ -284,11 +314,11 @@ export default function Dashboard() {
     setText(root, '.section-count', matches.length ? `${matches.length} today` : '0 today');
 
     const hotlistCount = root.querySelectorAll<HTMLElement>('.section-count-rose');
-    if (hotlist.length > 0) {
-      hotlistCount.forEach((element) => {
-        element.textContent = `${hotlist.length} ${hotlist.length === 1 ? 'property' : 'properties'}`;
-      });
-    }
+    hotlistCount.forEach((element) => {
+      element.textContent = hotlist.length > 0
+        ? `${hotlist.length} ${hotlist.length === 1 ? 'property' : 'properties'}`
+        : '0 properties';
+    });
 
     const logoutButton = root.querySelector<HTMLElement>('.user-logout');
     if (logoutButton) {
@@ -445,7 +475,9 @@ export default function Dashboard() {
           cacheOriginalInlineHandlers(card);
           removeInlineHandlers(card);
 
-          if (!isStaticTemplateRow) {
+          if (isStaticTemplateRow) {
+            neutraliseStaticHotlistCard(card, index);
+          } else {
             card.className = `hotlist-card${hotlistEntry.status === 'stale' ? ' status-stale' : ''}${hotlistEntry.status === 'under_offer' ? ' status-offer' : ''}${hotlistEntry.status === 'sold' ? ' status-sold' : ''}`;
             setText(card, '.hotlist-addr', textValue(match.address, 'Property address pending'));
             setHtml(card, '.hotlist-meta', `${formatMeta(match)} <span class="status-pill ${hotlistEntry.status === 'active' ? 'status-active' : 'status-drop'}">${textValue(hotlistEntry.status, 'ACTIVE').replace('_', ' ').toUpperCase()}</span>`);
@@ -507,17 +539,20 @@ export default function Dashboard() {
           const editNoteButton = card.querySelector<HTMLButtonElement>('.inspect-edit');
           if (editNoteButton) editNoteButton.onclick = () => inspectPanel?.classList.add('open');
 
-          const openProceed = () => openProceedModal(root, row, isStaticTemplateRow ? undefined : updateHotlist.mutate);
+          const openProceed = () => {
+            if (isStaticTemplateRow) return;
+            openProceedModal(root, row, updateHotlist.mutate);
+          };
           const useSuggestionButton = card.querySelector<HTMLButtonElement>('.suggest-use');
-          if (useSuggestionButton) useSuggestionButton.onclick = openProceed;
+          if (useSuggestionButton && !isStaticTemplateRow) useSuggestionButton.onclick = openProceed;
 
           const proceedButton = card.querySelector<HTMLButtonElement>('.btn-proceed');
-          if (proceedButton) proceedButton.onclick = openProceed;
+          if (proceedButton && !isStaticTemplateRow) proceedButton.onclick = openProceed;
 
           const fallbackCmaPath = cmaPath(row.cma) || row.cmaUrl || cmaPathFromButton(card.querySelector<HTMLElement>('.btn-cma')) || cmaPathFromButton(card.querySelector<HTMLElement>('.cma-run'));
           card.querySelectorAll<HTMLButtonElement>('.btn-cma, .cma-run').forEach((cmaButton) => {
-            const disabledByDesign = /under offer/i.test(cmaButton.textContent || '') || cmaButton.style.pointerEvents === 'none';
-            if (disabledByDesign) return;
+            const disabledByDesign = /under offer/i.test(cmaButton.textContent || '') || cmaButton.style.pointerEvents === 'none' || cmaButton.disabled;
+            if (disabledByDesign || isStaticTemplateRow) return;
             const buttonPath = cmaPathFromButton(cmaButton) || fallbackCmaPath;
             const isViewCma = !!cmaPath(row.cma) || /view cma/i.test(cmaButton.textContent || '');
             if (!isStaticTemplateRow) cmaButton.textContent = isViewCma ? 'View CMA →' : (cmaButton.classList.contains('cma-run') ? 'Run AI CMA →' : 'Run full CMA');
