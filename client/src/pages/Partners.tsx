@@ -62,6 +62,26 @@ function setStatus(status: HTMLDivElement | null, message: string, tone: 'info' 
   status.style.color = tone === 'error' ? '#B42318' : tone === 'success' ? '#067647' : '#475467';
 }
 
+function showPartnerSuccess(root: HTMLElement, payload: PartnerFormPayload) {
+  const formWrap = root.querySelector<HTMLElement>('#partnerFormWrap');
+  const success = root.querySelector<HTMLElement>('#partnerSuccess');
+  const successName = root.querySelector<HTMLElement>('#successName');
+
+  if (!success) return;
+
+  const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
+  if (successName) {
+    successName.textContent = fullName ? ` ${fullName}` : '';
+  }
+
+  if (formWrap) {
+    formWrap.style.display = 'none';
+  }
+
+  success.style.display = 'block';
+  success.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 export default function Partners() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -116,7 +136,7 @@ export default function Partners() {
 
       try {
         await registerPartner.mutateAsync(payload);
-        setStatus(status, "Thanks — your partner application has been submitted. We'll be in touch within one business day.", 'success');
+        showPartnerSuccess(root, payload);
         inputs.forEach((input) => {
           input.value = '';
         });

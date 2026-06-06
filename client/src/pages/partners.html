@@ -165,6 +165,23 @@ nav {
   padding:14px; cursor:pointer; transition:background 0.2s; margin-top:4px;
 }
 .btn-submit:hover { background:var(--sky-dark); }
+.partner-success {
+  display:none;
+  text-align:center;
+}
+.partner-success-icon {
+  width:42px; height:42px; border-radius:50%; margin:0 auto 16px;
+  display:flex; align-items:center; justify-content:center;
+  color:white; background:var(--sky); font-family:'Outfit',sans-serif;
+  font-size:22px; font-weight:700;
+}
+.partner-success-name {
+  color:var(--rose);
+}
+.partner-success-copy {
+  font-family:'Figtree',sans-serif; font-size:13px; color:var(--steel);
+  line-height:1.65; margin-top:12px;
+}
 
 @keyframes fadeUp { from {opacity:0;transform:translateY(12px);} to {opacity:1;transform:translateY(0);} }
 .page > * { animation:fadeUp 0.4s ease both; }
@@ -275,7 +292,7 @@ nav {
       <a href="https://referrer.com.au" style="font-family:'Figtree',sans-serif;font-size:12px;color:var(--sky);text-decoration:none;">Learn more at referrer.com.au →</a>
     </div>
 
-    <div class="form-section">
+    <div class="form-section" id="partnerFormWrap">
       <div class="form-title">Join the partner network</div>
       <div class="form-sub">Tell us about yourself and we'll be in touch within one business day.</div>
 
@@ -312,6 +329,12 @@ nav {
       <input class="field-input" type="text" placeholder="Your business name">
 
       <button class="btn-submit">Submit application</button>
+    </div>
+
+    <div class="form-section partner-success" id="partnerSuccess" role="status" aria-live="polite">
+      <div class="partner-success-icon">✓</div>
+      <div class="form-title">Thanks<span id="successName" class="partner-success-name"></span> — you're registered.</div>
+      <div class="partner-success-copy">Your partner application has been received. We'll review your details and be in touch within one business day.</div>
     </div>
   </div>
 
