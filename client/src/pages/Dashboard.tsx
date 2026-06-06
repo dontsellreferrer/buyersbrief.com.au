@@ -57,6 +57,54 @@ function setHtml(scope: ParentNode, selector: string, value: string) {
   if (element) element.innerHTML = value;
 }
 
+function safeExternalUrl(value: unknown) {
+  const raw = textValue(value, '');
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'https:' || url.protocol === 'http:') return url.toString();
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function propertyListingUrl(match: any) {
+  return safeExternalUrl(
+    match?.listingUrl ||
+    match?.listing_url ||
+    match?.rawJson?.listingUrl ||
+    match?.rawJson?.listing_url ||
+    match?.rawJson?.propertyUrl ||
+    match?.rawJson?.sourceUrl,
+  );
+}
+
+function setAddressLink(scope: ParentNode, selector: string, address: unknown, listingUrl?: unknown) {
+  const element = scope.querySelector<HTMLElement>(selector);
+  if (!element) return;
+
+  const label = textValue(address, 'Property address pending');
+  const safeUrl = safeExternalUrl(listingUrl);
+  element.textContent = '';
+
+  if (!safeUrl) {
+    element.textContent = label;
+    return;
+  }
+
+  const anchor = document.createElement('a');
+  anchor.href = safeUrl;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  anchor.textContent = label;
+  anchor.title = 'Open the verified property listing';
+  anchor.style.color = 'inherit';
+  anchor.style.textDecorationColor = 'rgba(127,168,212,0.55)';
+  anchor.style.textUnderlineOffset = '3px';
+  element.appendChild(anchor);
+}
+
 function setDisplayed(element: Element | null | undefined, shouldDisplay: boolean, displayValue = '') {
   if (element instanceof HTMLElement) {
     element.style.display = shouldDisplay ? displayValue : 'none';
@@ -397,7 +445,7 @@ export default function Dashboard() {
 
           card.className = `match-card${index < 2 ? ' new-match' : ''}`;
           setText(card, '.match-rank', `#${index + 1}`);
-          setText(card, '.match-addr', textValue(match.address, 'Address pending'));
+          setAddressLink(card, '.match-addr', textValue(match.address, 'Address pending'), propertyListingUrl(match));
           setHtml(card, '.match-meta', `${formatMeta(match)} <span class="meta-dot"></span> <span class="match-badge badge-new">${index < 2 ? 'NEW TODAY' : 'MATCH'}</span>`);
           setText(card, '.score-text', `${score}%`);
           setText(card, '.score-pct', `${score}% match`);
@@ -479,7 +527,7 @@ export default function Dashboard() {
             neutraliseStaticHotlistCard(card, index);
           } else {
             card.className = `hotlist-card${hotlistEntry.status === 'stale' ? ' status-stale' : ''}${hotlistEntry.status === 'under_offer' ? ' status-offer' : ''}${hotlistEntry.status === 'sold' ? ' status-sold' : ''}`;
-            setText(card, '.hotlist-addr', textValue(match.address, 'Property address pending'));
+            setAddressLink(card, '.hotlist-addr', textValue(match.address, 'Property address pending'), propertyListingUrl(match));
             setHtml(card, '.hotlist-meta', `${formatMeta(match)} <span class="status-pill ${hotlistEntry.status === 'active' ? 'status-active' : 'status-drop'}">${textValue(hotlistEntry.status, 'ACTIVE').replace('_', ' ').toUpperCase()}</span>`);
             setHtml(card, '.hotlist-change', `<span class="change-down">${escapeHtml(row.cma ? 'CMA ready' : 'Monitoring')}</span> <span style="color:rgba(127,168,212,0.4);">— added to your hotlist</span>`);
             setText(card, '.hotlist-price', textValue(match.priceDisplay, money(match.price)));
@@ -663,7 +711,7 @@ function openProceedModal(root: HTMLElement, row: any, updateHotlist?: (input: {
 
   const match = row.match || {};
   const hotlistEntry = row.hotlist || {};
-  setText(modalOverlay, '.modal-prop-addr', textValue(match.address, 'Selected property'));
+  setAddressLink(modalOverlay, '.modal-prop-addr', textValue(match.address, 'Selected property'), propertyListingUrl(match));
   setText(modalOverlay, '.modal-prop-meta', `${textValue(match.bedrooms, '—')} bed · ${textValue(match.bathrooms, '—')} bath · ${textValue(match.parking, 'Parking TBC')}`);
 
   const firstStep = modalOverlay.querySelectorAll<HTMLElement>('.modal-step')[0];

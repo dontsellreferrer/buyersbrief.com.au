@@ -125,6 +125,24 @@ const escapeHtml = (value: string): string => value
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#039;');
 
+const safeExternalUrl = (value?: string | null): string | null => {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' || url.protocol === 'http:') return url.toString();
+  } catch {
+    return null;
+  }
+  return null;
+};
+
+const linkedAddressHtml = (match: PreviewMatch): string => {
+  const label = escapeHtml(matchAddress(match));
+  const href = safeExternalUrl(match.listingUrl);
+  if (!href) return label;
+  return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="Open the verified property listing" style="color:inherit;text-decoration-color:rgba(127,168,212,0.55);text-underline-offset:3px;">${label}</a>`;
+};
+
 const titleCase = (value?: string | null): string => {
   if (!value) return '';
   return value
@@ -296,7 +314,7 @@ const renderPreviewMatches = (brief: StoredBriefData, matches: PreviewMatch[]) =
     const cards = visibleMatches.map((match, index) => `
       <div class="results-item">
         <div class="results-item-rank">#${index + 1}</div>
-        <div class="results-item-addr">${escapeHtml(matchAddress(match))}</div>
+        <div class="results-item-addr">${linkedAddressHtml(match)}</div>
         <div class="results-item-badge"${match.listingStatus === 'price_drop' ? ' style="background:rgba(76,175,125,0.12);color:var(--green);"' : ''}>${escapeHtml(matchBadge(match, index))}</div>
         <div class="results-item-price">${escapeHtml(match.priceDisplay || (match.price ? `$${Math.round(match.price).toLocaleString('en-AU')}` : 'POA'))}</div>
       </div>

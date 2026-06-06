@@ -550,6 +550,32 @@ function trendClass(t) {
   return '';
 }
 
+function htmlEscape(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function safeListingHref(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(String(value));
+    return (url.protocol === 'https:' || url.protocol === 'http:') ? url.toString() : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function addressLink(label, href) {
+  const safeLabel = htmlEscape(label || 'Property address pending');
+  const safeHref = safeListingHref(href);
+  if (!safeHref) return safeLabel;
+  return `<a href="${htmlEscape(safeHref)}" target="_blank" rel="noopener noreferrer" title="Open the verified property listing" style="color:inherit;text-decoration-color:rgba(127,168,212,0.55);text-underline-offset:3px;">${safeLabel}</a>`;
+}
+
 function renderCMA(d) {
   const s = d.subject;
   const v = d.valuation;
@@ -578,7 +604,7 @@ function renderCMA(d) {
           <div class="cma-label-dot"></div>
           Comparable Market Analysis
         </div>
-        <div class="cma-address">${s.address}</div>
+        <div class="cma-address">${addressLink(s.address, s.listing_source)}</div>
         <div class="cma-sub">
           ${s.property_type ? s.property_type.charAt(0).toUpperCase() + s.property_type.slice(1) : ''}
           ${s.bedrooms ? `<span class="dot"></span>${s.bedrooms} bed` : ''}
@@ -729,7 +755,7 @@ function renderCMA(d) {
           <tr>
             <td><div class="comp-rank">${c.rank}</div></td>
             <td class="comp-addr-cell">
-              <div class="comp-addr">${c.address}</div>
+              <div class="comp-addr">${addressLink(c.address, c.source_url)}</div>
               <div class="comp-meta">
                 ${c.bedrooms ? c.bedrooms+' bed' : ''}
                 ${c.bathrooms ? `<span class="mdot"></span>${c.bathrooms} bath` : ''}
