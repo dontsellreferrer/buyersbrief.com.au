@@ -62,7 +62,7 @@ function safeExternalUrl(value: unknown) {
   if (!raw) return null;
   try {
     const url = new URL(raw);
-    if (url.protocol === 'https:' || url.protocol === 'http:') return url.toString();
+    if (url.protocol === 'https:') return url.toString();
   } catch {
     return null;
   }

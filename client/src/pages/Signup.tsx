@@ -129,7 +129,7 @@ const safeExternalUrl = (value?: string | null): string | null => {
   if (!value) return null;
   try {
     const url = new URL(value);
-    if (url.protocol === 'https:' || url.protocol === 'http:') return url.toString();
+    if (url.protocol === 'https:') return url.toString();
   } catch {
     return null;
   }
