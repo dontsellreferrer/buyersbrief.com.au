@@ -9,6 +9,9 @@ import BriefIntake from "./pages/BriefIntake";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Partners from "./pages/Partners";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import Disclaimer from "./pages/Disclaimer";
 import Dashboard from "./pages/Dashboard";
 import CMA from "./pages/CMA";
 
@@ -21,6 +24,9 @@ function Router() {
       <Route path={"/login"} component={Login} />
       <Route path={"/signup"} component={Signup} />
       <Route path={"/partners"} component={Partners} />
+      <Route path={"/privacy"} component={Privacy} />
+      <Route path={"/terms"} component={Terms} />
+      <Route path={"/disclaimer"} component={Disclaimer} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/cma/:suburbSlug/:addressSlug"} component={CMA} />
       <Route path={"/cma/:property"} component={CMA} />
