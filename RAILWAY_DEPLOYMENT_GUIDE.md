@@ -31,12 +31,14 @@ The following variables must be configured in Railway. Values must be stored onl
 | `OPENAI_API_KEY` | Yes | AI search and CMA provider key. |
 | `ANTHROPIC_API_KEY` | Recommended | Optional fallback provider for AI search. |
 | `NODE_ENV` | Yes | Set to `production`. |
+| `CLICKSEND_USERNAME` | Yes | ClickSend subaccount username used for partner registration notification emails. |
+| `CLICKSEND_API_KEY` | Yes | ClickSend API key used with `CLICKSEND_USERNAME` for transactional email Basic Auth. |
+| `CLICKSEND_FROM_EMAIL_ADDRESS_ID` | Recommended | Verified ClickSend from-address ID for partner notification emails. Also accepts `CLICKSEND_EMAIL_ADDRESS_ID` or `CLICKSEND_EMAIL_FROM_ID`. |
+| `CLICKSEND_EMAIL_FROM_NAME` | Optional | Display name for partner notification emails. Defaults to `Buyers Brief`. |
+| `CLICKSEND_EMAIL_FROM` | Optional | Verified sender email fallback if no ClickSend from-address ID is supplied. |
+| `PARTNER_REGISTRATION_EMAIL_TO` | Optional | Notification recipient. Defaults to `rick@rickjohnson.com.au`. |
 | `STRIPE_SECRET_KEY` | Future | Required only when paid billing is enabled. |
 | `STRIPE_PUBLISHABLE_KEY` | Future | Required only when paid billing is enabled. |
-| `RESEND_API_KEY` | Future | Required only when email delivery is enabled. |
-| `TWILIO_ACCOUNT_SID` | Future | Required only when SMS delivery is enabled. |
-| `TWILIO_AUTH_TOKEN` | Future | Required only when SMS delivery is enabled. |
-| `TWILIO_PHONE_NUMBER` | Future | Required only when SMS delivery is enabled. |
 
 ## Deployment Workflow
 
