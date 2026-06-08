@@ -14,17 +14,19 @@ type PartnerFormPayload = {
 };
 
 function getPartnerFormPayload(root: HTMLElement): PartnerFormPayload {
-  const formSection = root.querySelector<HTMLElement>('.form-section');
+  const formSection = root.querySelector<HTMLElement>('#partnerFormWrap .form-section');
   const inputs = Array.from(formSection?.querySelectorAll<HTMLInputElement>('.field-input') ?? []);
-  const roleSelect = formSection?.querySelector<HTMLSelectElement>('.field-select');
+  const getInputValue = (selector: string, fallbackIndex: number) => {
+    return root.querySelector<HTMLInputElement>(selector)?.value.trim() ?? inputs[fallbackIndex]?.value.trim() ?? '';
+  };
 
   return {
-    firstName: inputs[0]?.value.trim() ?? '',
-    lastName: inputs[1]?.value.trim() ?? '',
-    email: inputs[2]?.value.trim() ?? '',
-    mobile: inputs[3]?.value.trim() ?? '',
-    role: roleSelect?.value.trim() ?? '',
-    businessName: inputs[4]?.value.trim() ?? '',
+    firstName: getInputValue('#p-first', 0),
+    lastName: getInputValue('#p-last', 1),
+    email: getInputValue('#p-email', 2),
+    mobile: getInputValue('#p-mobile', 3),
+    role: root.querySelector<HTMLSelectElement>('#p-role')?.value.trim() ?? formSection?.querySelector<HTMLSelectElement>('.field-select')?.value.trim() ?? '',
+    businessName: getInputValue('#p-business', 4),
   };
 }
 
@@ -37,8 +39,8 @@ function setFieldError(input: HTMLInputElement | HTMLSelectElement | undefined, 
 }
 
 function ensureStatusElement(root: HTMLElement): HTMLDivElement | null {
-  const formSection = root.querySelector<HTMLElement>('.form-section');
-  const submitButton = formSection?.querySelector<HTMLButtonElement>('.btn-submit');
+  const formSection = root.querySelector<HTMLElement>('#partnerFormWrap .form-section');
+  const submitButton = formSection?.querySelector<HTMLButtonElement>('#p-submit, .btn-submit');
   if (!formSection || !submitButton) return null;
 
   const existing = formSection.querySelector<HTMLDivElement>('[data-partner-submit-status="true"]');
@@ -71,7 +73,7 @@ function showPartnerSuccess(root: HTMLElement, payload: PartnerFormPayload) {
 
   const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
   if (successName) {
-    successName.textContent = fullName ? ` ${fullName}` : '';
+    successName.textContent = fullName;
   }
 
   if (formWrap) {
@@ -98,19 +100,20 @@ export default function Partners() {
     const root = containerRef.current;
     if (!root) return;
 
-    const formSection = root.querySelector<HTMLElement>('.form-section');
-    const submitButton = formSection?.querySelector<HTMLButtonElement>('.btn-submit');
+    const formWrap = root.querySelector<HTMLElement>('#partnerFormWrap');
+    const formSection = root.querySelector<HTMLElement>('#partnerFormWrap .form-section');
+    const submitButton = formSection?.querySelector<HTMLButtonElement>('#p-submit, .btn-submit');
     const inputs = Array.from(formSection?.querySelectorAll<HTMLInputElement>('.field-input') ?? []);
-    const roleSelect = formSection?.querySelector<HTMLSelectElement>('.field-select');
+    const roleSelect = formSection?.querySelector<HTMLSelectElement>('#p-role, .field-select');
     const status = ensureStatusElement(root);
 
-    if (!formSection || !submitButton) return;
+    if (!formWrap || !formSection || !submitButton) return;
 
     const handleSubmit = async (event: Event) => {
       event.preventDefault();
 
       const payload = getPartnerFormPayload(root);
-      const emailInput = inputs[2];
+      const emailInput = root.querySelector<HTMLInputElement>('#p-email') ?? inputs[2];
 
       if (!payload.firstName) {
         setFieldError(inputs[0], 'Please enter your first name.');
@@ -150,10 +153,18 @@ export default function Partners() {
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      void handleSubmit(event);
+    };
+
     submitButton.addEventListener('click', handleSubmit);
+    formWrap.addEventListener('keydown', handleKeyDown);
 
     return () => {
       submitButton.removeEventListener('click', handleSubmit);
+      formWrap.removeEventListener('keydown', handleKeyDown);
     };
   }, [registerPartner]);
 
