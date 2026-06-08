@@ -30,7 +30,7 @@ export type Message = {
   tool_call_id?: string;
 };
 
-export type Tool = {
+export type FunctionTool = {
   type: "function";
   function: {
     name: string;
@@ -38,6 +38,14 @@ export type Tool = {
     parameters?: Record<string, unknown>;
   };
 };
+
+export type WebSearchTool = {
+  type: "web_search_preview";
+  search_context_size?: "low" | "medium" | "high";
+  user_location?: Record<string, unknown>;
+};
+
+export type Tool = FunctionTool | WebSearchTool;
 
 export type ToolChoicePrimitive = "none" | "auto" | "required";
 export type ToolChoiceByName = { name: string };
@@ -75,7 +83,8 @@ export type InvokeParams = {
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
   model?: string;
-  requireAnthropic?: boolean;
+  temperature?: number;
+  timeoutMs?: number;
 };
 
 export type ToolCall = {
@@ -128,16 +137,21 @@ const normalizeOpenAIMessage = (message: Message) => ({
   ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
 });
 
+const functionTools = (tools: Tool[] | undefined): FunctionTool[] | undefined => {
+  const onlyFunctions = tools?.filter((tool): tool is FunctionTool => tool.type === "function");
+  return onlyFunctions && onlyFunctions.length > 0 ? onlyFunctions : undefined;
+};
+
 const normalizeToolChoice = (
   toolChoice: ToolChoice | undefined,
-  tools: Tool[] | undefined,
+  tools: FunctionTool[] | undefined,
 ): "none" | "auto" | ToolChoiceExplicit | undefined => {
   if (!toolChoice) return undefined;
   if (toolChoice === "none" || toolChoice === "auto") return toolChoice;
 
   if (toolChoice === "required") {
     if (!tools || tools.length === 0) {
-      throw new Error("tool_choice 'required' was provided but no tools were configured");
+      throw new Error("tool_choice 'required' was provided but no function tools were configured");
     }
     if (tools.length > 1) {
       throw new Error("tool_choice 'required' needs a single tool or specify the tool name explicitly");
@@ -182,36 +196,37 @@ const normalizeResponseFormat = ({
   };
 };
 
-function getJsonInstruction(format?: ResponseFormat): string {
-  if (!format || format.type === "text") return "";
-  if (format.type === "json_object") {
-    return "Return only a valid JSON object. Do not wrap it in markdown fences or explanatory prose.";
-  }
-  return `Return only valid JSON matching this JSON Schema. Do not wrap it in markdown fences or explanatory prose. Schema: ${JSON.stringify(format.json_schema.schema)}`;
-}
-
-function providerTimeoutMs(): number {
+function providerTimeoutMs(params?: InvokeParams): number {
+  if (params?.timeoutMs && Number.isFinite(params.timeoutMs) && params.timeoutMs > 0) return params.timeoutMs;
   const value = Number(process.env.LLM_TIMEOUT_MS || "60000");
   return Number.isFinite(value) && value > 0 ? value : 60000;
 }
 
-async function invokeOpenAI(params: InvokeParams, responseFormat?: ResponseFormat): Promise<InvokeResult> {
+function getOpenAIConfig() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  return {
+    apiKey,
+    baseUrl: (process.env.OPENAI_API_BASE || "https://api.openai.com/v1").replace(/\/$/, ""),
+  };
+}
 
+async function invokeOpenAIChat(params: InvokeParams, responseFormat?: ResponseFormat): Promise<InvokeResult> {
+  const { apiKey, baseUrl } = getOpenAIConfig();
+  const tools = functionTools(params.tools);
   const payload: Record<string, unknown> = {
-    model: params.model || process.env.OPENAI_MODEL || "gpt-4.1-nano",
+    model: params.model || process.env.OPENAI_MODEL || "gpt-4o-mini",
     messages: params.messages.map(normalizeOpenAIMessage),
     max_tokens: params.max_tokens || params.maxTokens || 4096,
   };
 
-  if (params.tools?.length) payload.tools = params.tools;
-  const toolChoice = normalizeToolChoice(params.toolChoice || params.tool_choice, params.tools);
+  if (typeof params.temperature === "number") payload.temperature = params.temperature;
+  if (tools?.length) payload.tools = tools;
+  const toolChoice = normalizeToolChoice(params.toolChoice || params.tool_choice, tools);
   if (toolChoice) payload.tool_choice = toolChoice;
   if (responseFormat?.type === "json_object") payload.response_format = { type: "json_object" };
   if (responseFormat?.type === "json_schema") payload.response_format = responseFormat;
 
-  const baseUrl = (process.env.OPENAI_API_BASE || "https://api.openai.com/v1").replace(/\/$/, "");
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -219,7 +234,7 @@ async function invokeOpenAI(params: InvokeParams, responseFormat?: ResponseForma
       authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(providerTimeoutMs()),
+    signal: AbortSignal.timeout(providerTimeoutMs(params)),
   });
 
   if (!response.ok) {
@@ -238,98 +253,105 @@ async function invokeOpenAI(params: InvokeParams, responseFormat?: ResponseForma
   return data;
 }
 
-async function invokeAnthropic(params: InvokeParams, responseFormat?: ResponseFormat): Promise<InvokeResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
+type OpenAIResponsesResult = {
+  id?: string;
+  created_at?: number;
+  model?: string;
+  output?: Array<{
+    type?: string;
+    content?: Array<{ type?: string; text?: string }>;
+  }>;
+  output_text?: string;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
+  error?: { message?: string } | string;
+};
 
-  const systemParts: string[] = [];
-  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+function responsesText(data: OpenAIResponsesResult): string {
+  if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text;
+  return (data.output || [])
+    .flatMap((item) => item.content || [])
+    .filter((part) => part.type === "output_text" || part.type === "text")
+    .map((part) => part.text || "")
+    .filter(Boolean)
+    .join("\n");
+}
 
-  for (const message of params.messages) {
-    if (message.role === "system") {
-      systemParts.push(contentToText(message.content));
-      continue;
-    }
-
-    const role = message.role === "assistant" ? "assistant" : "user";
-    messages.push({ role, content: contentToText(message.content) });
-  }
-
-  const jsonInstruction = getJsonInstruction(responseFormat);
-  if (jsonInstruction) systemParts.push(jsonInstruction);
-
-  const payload = {
-    model: params.model || process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
-    max_tokens: params.max_tokens || params.maxTokens || 4096,
-    system: systemParts.join("\n\n"),
-    messages,
+async function invokeOpenAIResponses(params: InvokeParams, responseFormat?: ResponseFormat): Promise<InvokeResult> {
+  const { apiKey, baseUrl } = getOpenAIConfig();
+  const payload: Record<string, unknown> = {
+    model: params.model || process.env.OPENAI_MODEL || "gpt-4o",
+    input: params.messages.map((message) => ({
+      role: message.role === "function" || message.role === "tool" ? "user" : message.role,
+      content: contentToText(message.content),
+    })),
+    tools: params.tools || [],
+    max_output_tokens: params.max_tokens || params.maxTokens || 4096,
   };
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  if (typeof params.temperature === "number") payload.temperature = params.temperature;
+  if (responseFormat?.type === "json_schema") {
+    payload.text = {
+      format: {
+        type: "json_schema",
+        name: responseFormat.json_schema.name,
+        schema: responseFormat.json_schema.schema,
+        strict: responseFormat.json_schema.strict ?? false,
+      },
+    };
+  } else if (responseFormat?.type === "json_object") {
+    payload.text = { format: { type: "json_object" } };
+  }
+
+  const response = await fetch(`${baseUrl}/responses`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(providerTimeoutMs()),
+    signal: AbortSignal.timeout(providerTimeoutMs(params)),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Anthropic invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+    throw new Error(`OpenAI Responses invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
   }
 
-  const data = await response.json() as {
-    id: string;
-    model: string;
-    stop_reason?: string;
-    usage?: { input_tokens?: number; output_tokens?: number };
-    content?: Array<{ type: string; text?: string }>;
-  };
-  const text = data.content?.filter((part) => part.type === "text").map((part) => part.text || "").join("\n") || "";
-  const promptTokens = data.usage?.input_tokens || 0;
-  const completionTokens = data.usage?.output_tokens || 0;
+  const data = await response.json() as OpenAIResponsesResult;
+  if (data.error) {
+    const message = typeof data.error === "string" ? data.error : data.error.message || JSON.stringify(data.error);
+    throw new Error(`OpenAI Responses invoke failed: ${message}`);
+  }
 
+  const text = responsesText(data);
   return {
-    id: data.id,
-    created: Math.floor(Date.now() / 1000),
-    model: data.model,
+    id: data.id || `resp_${Date.now()}`,
+    created: data.created_at || Math.floor(Date.now() / 1000),
+    model: data.model || params.model || process.env.OPENAI_MODEL || "gpt-4o",
     choices: [{
       index: 0,
       message: { role: "assistant", content: text },
-      finish_reason: data.stop_reason || null,
+      finish_reason: null,
     }],
     usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
+      prompt_tokens: data.usage?.input_tokens || 0,
+      completion_tokens: data.usage?.output_tokens || 0,
+      total_tokens: data.usage?.total_tokens || ((data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)),
     },
   };
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const responseFormat = normalizeResponseFormat(params);
+  const needsResponsesApi = params.tools?.some((tool) => tool.type !== "function") || false;
 
-  if (params.requireAnthropic) {
-    return invokeAnthropic(params, responseFormat);
+  if (needsResponsesApi) {
+    return invokeOpenAIResponses(params, responseFormat);
   }
 
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      return await invokeAnthropic(params, responseFormat);
-    } catch (error) {
-      if (!process.env.OPENAI_API_KEY) throw error;
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[LLM] Anthropic invoke failed; falling back to OpenAI: ${message}`);
-      return invokeOpenAI(params, responseFormat);
-    }
-  }
-
-  if (process.env.OPENAI_API_KEY) {
-    return invokeOpenAI(params, responseFormat);
-  }
-
-  throw new Error("No direct LLM provider is configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.");
+  return invokeOpenAIChat(params, responseFormat);
 }

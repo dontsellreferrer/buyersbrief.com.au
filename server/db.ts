@@ -609,6 +609,22 @@ export async function getLatestBriefByUserId(userId: number): Promise<Brief | nu
   }
 }
 
+export async function getActiveBriefs(limit = 100): Promise<Brief[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  try {
+    return await db
+      .select()
+      .from(briefs)
+      .where(eq(briefs.status, "active"))
+      .orderBy(desc(briefs.updatedAt))
+      .limit(limit);
+  } catch (error) {
+    console.warn("[Database] Active brief select failed; returning an empty scheduler set", error);
+    return [];
+  }
+}
 
 export async function createMatchesForBrief(briefId: number, values: Omit<InsertMatch, "briefId">[]): Promise<Match[]> {
   const db = getDb();

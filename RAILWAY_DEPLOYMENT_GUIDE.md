@@ -28,8 +28,9 @@ The following variables must be configured in Railway. Values must be stored onl
 |---|---:|---|
 | `DATABASE_URL` | Yes | Supabase PostgreSQL connection string. |
 | `JWT_SECRET` | Yes | Session token signing secret. Use a long random value. |
-| `OPENAI_API_KEY` | Yes | AI search and CMA provider key. |
-| `ANTHROPIC_API_KEY` | Recommended | Optional fallback provider for AI search. |
+| `OPENAI_API_KEY` | Yes | GPT-4o AI search and CMA provider key. |
+| `OPENAI_SEARCH_MODEL` | Optional | GPT-4o search model override. Defaults to `gpt-4o`. |
+| `LLM_TIMEOUT_MS` | Optional | LLM request timeout in milliseconds. Defaults to `60000`; search calls also enforce their own 45-second timeout. |
 | `NODE_ENV` | Yes | Set to `production`. |
 | `CLICKSEND_USERNAME` | Yes | ClickSend subaccount username used for partner registration notification emails. |
 | `CLICKSEND_API_KEY` | Yes | ClickSend API key used with `CLICKSEND_USERNAME` for transactional email Basic Auth. |
@@ -61,6 +62,23 @@ git push
 ```
 
 Railway normally installs dependencies, builds the project, starts the production server, and exposes the updated deployment within several minutes.
+
+## Daily Search Scheduler
+
+The property-search workflow is OpenAI-only. The standalone `POST /api/search` route and the dashboard preview/search mutations now call GPT-4o with web search from the server, so browser-side JavaScript rendering limitations in third-party analysis tools are avoided.
+
+Configure a Railway cron service or scheduled job with the command below after the normal build step has completed.
+
+```bash
+pnpm scheduler
+```
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `SCHEDULER_BRIEF_LIMIT` | Optional | Maximum active briefs processed per run. Defaults to `500`. |
+| `SCHEDULER_DELAY_MS` | Optional | Delay between brief searches to avoid provider rate spikes. Defaults to `3000`. |
+
+The scheduler fetches active briefs, runs the same GPT-4o search logic, deduplicates matches by listing URL or address, inserts only newly discovered matches, and updates each brief's `lastRunAt` timestamp.
 
 ## DNS Configuration
 

@@ -7,6 +7,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { ensureProductionSchema } from "../db";
 import { serveStatic, setupVite } from "./vite";
+import { registerSearchApi } from "../searchApi";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -45,6 +46,9 @@ async function startServer() {
       createContext,
     })
   );
+
+  registerSearchApi(app);
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

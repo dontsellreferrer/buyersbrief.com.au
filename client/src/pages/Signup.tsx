@@ -70,9 +70,9 @@ const isTrustedPreviewMatch = (item: unknown): item is PreviewMatch => {
   const rawJson = (item as PreviewMatch).rawJson;
   return Boolean(
     rawJson &&
-    rawJson._buyersbriefSource === 'anthropic_verified_source_only' &&
-    rawJson._buyersbriefProvider === 'anthropic' &&
-    rawJson._verifiedSourceRecordsRequired === true
+    rawJson._buyersbriefSource === 'gpt4o_web_search_preview' &&
+    rawJson._buyersbriefProvider === 'openai' &&
+    rawJson._verifiedRenderedListingSearch === true
   );
 };
 
@@ -443,7 +443,7 @@ export default function Signup() {
     const matches = (response.matches as PreviewMatch[]).filter(isTrustedPreviewMatch);
     setStoredPreviewMatches(matches);
     if (matches.length === 0) {
-      throw new Error('No verified Anthropic property matches were returned. Synthetic preview results are blocked.');
+      throw new Error('No verified GPT-4o property matches were returned. Synthetic preview results are blocked.');
     }
     renderPreviewMatches(briefData, matches);
     return matches;
