@@ -1151,7 +1151,7 @@ function confirmCancel() {
   // DEV: POST /api/subscription/cancel
   // Stripe cancels at period end — user keeps access until then
   // Set user.tier = 'cancelling' in Supabase — still active until billing date
-  // Send confirmation email via Resend: "Updates stop on 29 June. Your account stays open."
+  // Send confirmation email via ClickSend: "Updates stop on 29 June. Your account stays open."
   const confirm = document.getElementById('cancelConfirm');
   confirm.innerHTML = `
     <div class="cancel-confirm-text" style="color:var(--steel);">

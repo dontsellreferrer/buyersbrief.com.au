@@ -10,7 +10,7 @@ BuyersBrief is a production React, Express, tRPC, and PostgreSQL application for
 | Backend | Node.js, Express, tRPC | API traffic is exposed under `/api/trpc`. |
 | Database | Supabase PostgreSQL via Drizzle ORM | Schema lives in `drizzle/schema.ts`; query helpers live in `server/db.ts`. |
 | Authentication | Local email/password and JWT session cookie | Auth procedures are implemented in `server/routers.ts` and session helpers under `server/_core`. |
-| AI search | Direct OpenAI and Anthropic API keys | Provider logic lives in `server/services/search.ts` and `server/_core/llm.ts`. |
+| AI search | Direct OpenAI API key | Provider logic lives in `server/services/search.ts` and `server/_core/llm.ts`. |
 | Hosting | Railway | GitHub `main` pushes trigger production deployment. |
 | DNS | Cloudflare | `buyersbrief.com.au` points to the Railway deployment. |
 
@@ -38,10 +38,9 @@ pnpm dev
 | `DATABASE_URL` | Supabase PostgreSQL connection string. |
 | `JWT_SECRET` | Session token signing secret. |
 | `OPENAI_API_KEY` | AI search and CMA provider key. |
-| `ANTHROPIC_API_KEY` | Optional AI provider fallback key. |
 | `NODE_ENV` | Set to `production` in Railway. |
 
-Additional commercial-service variables may be added as features are completed, including Stripe, Resend, or Twilio variables. Do not commit `.env` files or raw credentials.
+Additional commercial-service variables may be added as features are completed, including Stripe and ClickSend variables. Do not commit `.env` files or raw credentials.
 
 ## Key Project Files
 
