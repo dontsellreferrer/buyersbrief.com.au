@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
@@ -624,6 +624,46 @@ export async function getActiveBriefs(limit = 100): Promise<Brief[]> {
     console.warn("[Database] Active brief select failed; returning an empty scheduler set", error);
     return [];
   }
+}
+
+export type MatchNotificationCandidate = {
+  user: User;
+  brief: Brief;
+  match: Match;
+};
+
+export async function getUnnotifiedMatchCandidates(limit = 500): Promise<MatchNotificationCandidate[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  try {
+    const rows = await db
+      .select({ user: users, brief: briefs, match: matches })
+      .from(matches)
+      .innerJoin(briefs, eq(matches.briefId, briefs.id))
+      .innerJoin(users, eq(briefs.userId, users.id))
+      .where(and(eq(briefs.status, "active"), eq(matches.status, "new"), isNull(matches.notifiedAt)))
+      .orderBy(desc(matches.score), desc(matches.foundAt))
+      .limit(limit);
+
+    return rows;
+  } catch (error) {
+    console.warn("[Database] Unnotified match select failed; returning an empty notification set", error);
+    return [];
+  }
+}
+
+export async function markMatchesNotified(matchIds: number[], notifiedAt = new Date()): Promise<number> {
+  const db = getDb();
+  if (!db || matchIds.length === 0) return 0;
+
+  const result = await db
+    .update(matches)
+    .set({ notifiedAt })
+    .where(inArray(matches.id, matchIds))
+    .returning({ id: matches.id });
+
+  return result.length;
 }
 
 export async function createMatchesForBrief(briefId: number, values: Omit<InsertMatch, "briefId">[]): Promise<Match[]> {

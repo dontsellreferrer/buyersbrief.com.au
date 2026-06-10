@@ -28,10 +28,10 @@
 
 ### API Keys & Secrets (To be added via Railway secrets workflow)
 - [ ] OpenAI API key (REQUIRED for CMA engine)
-- [ ] Anthropic API key (REQUIRED for brief search) — PLACEHOLDER FOR NOW
+- [x] OpenAI API key (REQUIRED for brief search)
 - [ ] Stripe API keys (REQUIRED for payments) — PLACEHOLDER FOR NOW
-- [ ] Resend API key (REQUIRED for email) — PLACEHOLDER FOR NOW
-- [ ] Twilio credentials (REQUIRED for SMS) — PLACEHOLDER FOR NOW
+- [ ] ClickSend credentials (REQUIRED for transactional email and SMS alerts)
+- [ ] ClickSend sender configuration (REQUIRED for verified email/SMS sender identity)
 - [ ] JWT_SECRET (generated and stored in Railway secrets)
 
 ---
@@ -57,7 +57,7 @@
 - [x] Progress indicator showing 6 steps
 - [ ] Form validation and error handling
 - [ ] Prompt construction from form data
-- [ ] Claude API call with web search enabled
+- [x] OpenAI search API call with web search enabled
 - [x] Results rendering with score ring cards
 - [x] Hit/miss breakdown per property
 - [x] Liam's one-line note per property
@@ -124,7 +124,7 @@
 - [ ] briefs.list (get user's briefs)
 - [ ] briefs.getById (get single brief)
 - [ ] matches.list (get matches for brief)
-- [ ] matches.create (save match results from Claude)
+- [ ] matches.create (save match results from OpenAI search)
 - [ ] hotlist.add (add match to hotlist)
 - [ ] hotlist.list (get user's hotlist)
 - [ ] hotlist.updateInspectionNote (save inspection note)
@@ -135,11 +135,11 @@
 - [ ] users.updateStripeId (save Stripe customer ID)
 
 ### API Integrations
-- [ ] Claude (Anthropic) API for brief search with web search enabled
+- [x] OpenAI API for brief search with web search enabled
 - [ ] GPT-4o (OpenAI) API for CMA engine with web search enabled
 - [ ] Stripe API for subscription management
-- [ ] Resend API for transactional email
-- [ ] Twilio API for SMS alerts
+- [ ] ClickSend API for transactional email
+- [ ] ClickSend API for SMS alerts
 
 ### Liam's Offer Suggestion Engine
 - [ ] Parse inspection notes for renovation/risk items
@@ -152,21 +152,21 @@
 ## PHASE 4: CRON SCHEDULER & ALERTS
 
 ### Daily Brief Matching Scheduler
-- [ ] Set up cron job (runs daily at 6 AM)
+- [ ] Set up Railway match cron job (runs daily at 3:00 AM Sydney time)
 - [ ] Query all active briefs from database
-- [ ] For each brief, construct Claude prompt
-- [ ] Call Claude API with web search
+- [ ] For each brief, construct OpenAI search payload
+- [ ] Call OpenAI search with web search
 - [ ] Parse results and save matches to database
 - [ ] Identify new matches (not previously found)
 - [ ] Log scheduler execution (last_run_at timestamp)
 
-### Email Alerts (Resend)
+### Email Alerts (ClickSend)
 - [ ] Build email template for daily matches
 - [ ] Send email to user with new matches
 - [ ] Include match score, property details, and Liam's note
 - [ ] Include link to dashboard
 
-### SMS Alerts (Twilio)
+### SMS Alerts (ClickSend)
 - [ ] Check user SMS consent before sending
 - [ ] Build SMS template (concise, no links)
 - [ ] Send SMS for high-scoring matches (85%+)
@@ -199,14 +199,13 @@
 ### Environment Variables (Railway)
 - [ ] DATABASE_URL (Supabase connection string)
 - [ ] OPENAI_API_KEY
-- [ ] ANTHROPIC_API_KEY
 - [ ] STRIPE_SECRET_KEY
 - [ ] STRIPE_PUBLISHABLE_KEY
 - [ ] STRIPE_WEBHOOK_SECRET
-- [ ] RESEND_API_KEY
-- [ ] TWILIO_ACCOUNT_SID
-- [ ] TWILIO_AUTH_TOKEN
-- [ ] TWILIO_PHONE_NUMBER
+- [ ] CLICKSEND_USERNAME
+- [ ] CLICKSEND_API_KEY
+- [ ] CLICKSEND_FROM_EMAIL_ADDRESS_ID
+- [ ] CLICKSEND_SMS_FROM
 - [ ] JWT_SECRET
 - [ ] NODE_ENV=production
 
@@ -221,10 +220,10 @@
 ## KNOWN BLOCKERS & BUGS (To Address Before Live)
 
 ### API Keys & Credentials
-- [ ] **BUG:** Anthropic API key is placeholder — needs real key before brief search works
+- [x] OpenAI API key configured for brief search
 - [ ] **BUG:** Stripe keys are placeholder — needs real keys before payments work
-- [ ] **BUG:** Resend API key is placeholder — needs real key before email alerts work
-- [ ] **BUG:** Twilio credentials are placeholder — needs real keys before SMS alerts work
+- [ ] **BUG:** ClickSend sender configuration needs verification before email alerts are relied on
+- [ ] **BUG:** ClickSend SMS sender configuration needs verification before SMS alerts are relied on
 
 ### Features Not Yet Implemented
 - [ ] referrer.com.au API integration (lead routing for hot signals)
@@ -235,11 +234,11 @@
 
 ### Testing & QA
 - [ ] End-to-end testing of brief intake → signup → dashboard flow
-- [ ] Test Claude API with various brief inputs
+- [ ] Test OpenAI search with various brief inputs
 - [ ] Test GPT-4o CMA engine with real property URLs
 - [ ] Test Stripe payment flow (test mode)
-- [ ] Test email alerts (Resend sandbox)
-- [ ] Test SMS alerts (Twilio test credentials)
+- [ ] Test email alerts through ClickSend
+- [ ] Test SMS alerts through ClickSend
 - [ ] Load testing for daily scheduler
 - [ ] Mobile responsiveness testing
 

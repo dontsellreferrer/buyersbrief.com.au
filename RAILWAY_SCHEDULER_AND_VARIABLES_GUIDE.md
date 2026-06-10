@@ -1,4 +1,4 @@
-# BuyersBrief Railway Variables and Scheduler Guide
+# BuyersBrief Railway Variables and Two-Stage Scheduler Guide
 
 **Project:** buyersbrief.com.au  
 **Prepared by:** Manus AI  
@@ -8,96 +8,110 @@
 
 The production Railway service shown by the user is connected to the GitHub repository `dontsellreferrer/buyersbrief.com.au`, uses the `main` branch for production, and has automatic deploys enabled when changes are pushed to GitHub. This matches the required production model: GitHub-controlled Railway deployment, with no Manus-hosted runtime dependency.
 
-The Railway variables screenshot shows that the main web service already has the core production variables required for the current OpenAI-based application. It also shows two deprecated AI-provider variables that are no longer used by this project and should be removed from Railway after the repository cleanup has been deployed and verified.
+The Railway variables screenshot shows that the main web service already has the core production variables required for the current OpenAI-based application. The separate Railway scheduler services have not yet been created, so the production system currently serves the website but does not yet have scheduled daily matching or scheduled morning notification dispatch.
 
 | Area | Status | Evidence / Required Action |
 |---|---|---|
 | GitHub source | Present | Railway service is connected to `dontsellreferrer/buyersbrief.com.au`. |
 | Production branch | Present | Production branch is `main`. |
 | Auto deploy | Present | Railway auto-deploys when pushed to GitHub. |
-| Database | Present | `DATABASE_URL` is present. `POSTGRES_URL` is also present, but current server code uses `DATABASE_URL`. |
+| Database | Present | `DATABASE_URL` is present. `POSTGRES_URL` is also present, but current server code uses `DATABASE_URL` unless `POSTGRES_URL` is supplied. |
 | Auth/session secret | Present | `JWT_SECRET` is present. |
 | OpenAI | Present | `OPENAI_API_KEY` is present. |
 | Runtime mode | Present | `NODE_ENV` is present and should be set to `production`. |
 | ClickSend base credentials | Present | `CLICKSEND_USERNAME` and `CLICKSEND_API_KEY` are present. |
-| ClickSend sender | Needs name alignment | Railway has `CLICKSEND_FROM`; current code expects `CLICKSEND_EMAIL_FROM`, `CLICKSEND_FROM_EMAIL`, or a sender ID variable such as `CLICKSEND_FROM_EMAIL_ADDRESS_ID`. |
-| Deprecated AI-provider variables | Should remove | Two variables from the previous AI provider are present but no longer used by the current OpenAI-only application. |
-| Deprecated email-provider variables | Probably unused | Two variables from the previous email provider are present; current server code does not reference them, and user-facing copy has been updated to ClickSend. |
+| ClickSend sender | Needs name alignment | Railway has `CLICKSEND_FROM`; current notification code can use `CLICKSEND_FROM`, but a verified sender ID variable such as `CLICKSEND_FROM_EMAIL_ADDRESS_ID` is still preferred for email reliability. |
 | Scheduler / cron | Missing | User confirmed no separate scheduler or cron service exists in Railway. |
 
-## What the Scheduler Is
+## Recommended Two-Stage Scheduler Design
 
-The scheduler is a separate Railway service that runs the project’s existing daily search script. It is not the public website. The public website stays online continuously using `pnpm start`, while the scheduler should wake up on a timed schedule, run `pnpm scheduler`, process active buyer briefs, save new matches, and then exit.
+The scheduler should be split into two Railway cron services. The first service performs the expensive OpenAI-backed matching before business hours. The second service sends user-facing ClickSend notifications at a normal morning delivery time.
 
-Railway’s cron feature starts a service based on a crontab expression. Railway expects cron services to execute a task and terminate once finished, leaving no open resources.[1] Railway schedules use UTC, so Sydney time must be converted to UTC when choosing the cron expression.[1]
+| Stage | Railway service name | Command | Sydney time | AEST UTC cron | AEDT UTC cron | Purpose |
+|---|---|---|---:|---|---|---|
+| Matching | `buyersbrief-daily-match` | `pnpm scheduler:match` | 3:00 AM | `0 17 * * *` | `0 16 * * *` | Runs daily property matching and stores new matches. |
+| Notifications | `buyersbrief-daily-notify` | `pnpm scheduler:notify` | 8:00 AM | `0 22 * * *` | `0 21 * * *` | Sends ClickSend email/SMS alerts for unnotified new matches. |
 
-> Railway documentation: “Services configured as cron jobs are expected to execute a task, and terminate as soon as that task is finished, leaving no open resources.”[1]
+Railway cron schedules are UTC-based, so Sydney time must be converted to UTC when setting the cron expression.[1] Because Sydney is on AEST in June, 3:00 AM Sydney is 5:00 PM UTC on the previous UTC day, and 8:00 AM Sydney is 10:00 PM UTC on the previous UTC day. When daylight saving begins, update the cron expressions if exact local delivery time matters.
 
-## Recommended Scheduler Setup
+> Railway documentation states that cron services are expected to execute a task and terminate after the task completes, leaving no open resources.[1]
 
-Create a second Railway service in the same project, using the same GitHub repository and branch as the main web service. This second service should not expose the public domain. Its only purpose is to run the scheduler command on a daily cron schedule.
+## Package Commands Added
 
-| Setting | Recommended value |
+The repository now exposes explicit commands for the two Railway services. `pnpm scheduler` remains as a backwards-compatible alias for the matching stage, but the explicit commands are preferred for production.
+
+| Command | Use |
 |---|---|
-| Service name | `buyersbrief-daily-search` |
-| Source repository | `dontsellreferrer/buyersbrief.com.au` |
-| Branch | `main` |
-| Build command | Same as main service, or Railway default if it already runs `pnpm build` correctly |
-| Start command | `pnpm scheduler` |
-| Cron schedule | Choose after confirming desired Sydney run time |
-| Public domain | None required |
-| Variables | Same database and OpenAI variables as the main service, plus optional scheduler throttling variables |
+| `pnpm scheduler:match` | Production 3:00 AM matching job. |
+| `pnpm scheduler:notify` | Production 8:00 AM notification dispatch job. |
+| `pnpm scheduler:all` | Manual combined run only; not recommended as the normal production cron because it would send notifications immediately after matching. |
+| `pnpm scheduler` | Backwards-compatible alias for `pnpm scheduler:match`. |
 
-## Scheduler Variables
+## Variables for Each Railway Service
 
-The scheduler needs access to the same production database and OpenAI key as the main website because it reads active briefs, runs OpenAI-backed search, and writes newly discovered matches.
+Both scheduled services should be separate from the public website service. Do not change the current website service command from `pnpm start`.
 
-| Variable | Required | Notes |
-|---|---:|---|
-| `DATABASE_URL` | Yes | Same production Supabase PostgreSQL URL used by the main service. |
-| `JWT_SECRET` | Recommended | Not directly required for search processing, but safe to keep shared with app runtime if copied wholesale. |
-| `OPENAI_API_KEY` | Yes | Required for GPT-4o property search. |
-| `OPENAI_SEARCH_MODEL` | Optional | Defaults to `gpt-4o`. |
-| `LLM_TIMEOUT_MS` | Optional | Defaults to the project’s built-in timeout behavior. |
-| `NODE_ENV` | Yes | Set to `production`. |
-| `SCHEDULER_BRIEF_LIMIT` | Optional | Defaults to `500`; use a smaller number initially, such as `25`, if you want a cautious first run. |
-| `SCHEDULER_DELAY_MS` | Optional | Defaults to `3000`; this waits three seconds between briefs to avoid provider spikes. |
+| Variable | Web service | Match service | Notify service | Notes |
+|---|---:|---:|---:|---|
+| `DATABASE_URL` or `POSTGRES_URL` | Yes | Yes | Yes | Must point to the same production database. |
+| `JWT_SECRET` | Yes | Optional | Optional | Required by the web service; harmless to share with scheduler services. |
+| `OPENAI_API_KEY` | Yes | Yes | No | Required only for the matching service and search API. |
+| `OPENAI_SEARCH_MODEL` | Optional | Optional | No | Defaults to the project search model if unset. |
+| `LLM_TIMEOUT_MS` | Optional | Optional | No | Optional OpenAI timeout tuning. |
+| `NODE_ENV` | Yes | Yes | Yes | Set to `production`. |
+| `SCHEDULER_BRIEF_LIMIT` | No | Optional | No | Defaults to `500`; set lower for cautious first runs. |
+| `SCHEDULER_DELAY_MS` | No | Optional | No | Defaults to `3000`, creating a pause between briefs. |
+| `SCHEDULER_NOTIFY_LIMIT` | No | No | Optional | Defaults to `1000` unnotified match rows per run. |
+| `CLICKSEND_USERNAME` | Yes if partner form is live | No | Yes | Required for notification dispatch. |
+| `CLICKSEND_API_KEY` | Yes if partner form is live | No | Yes | Required for notification dispatch. |
+| `CLICKSEND_FROM` | Useful | No | Useful | Current Railway variable can be used as fallback sender. |
+| `CLICKSEND_FROM_EMAIL_ADDRESS_ID` | Preferred | No | Preferred | Use a verified ClickSend email sender ID where available. |
+| `CLICKSEND_SMS_FROM` | Optional | No | Optional | Defaults to `BuyersBrief` if unset. |
 
-ClickSend variables are not required for the current scheduler script unless scheduler-triggered match notifications are added later. The current scheduler creates matches and updates `lastRunAt`; it does not send email or SMS.
+## Notification Behaviour
 
-## Sydney-Time Cron Examples
+The notification service sends email by default when a user has new unnotified matches unless the user has explicitly disabled daily email in their notification preferences. SMS is stricter: it is sent only when the user has enabled hot SMS notifications, has SMS consent recorded, and has a mobile number on file.
 
-Railway cron schedules are UTC-based.[1] Sydney is UTC+10 during AEST and UTC+11 during AEDT. Because the current date is June 2026, Sydney is on AEST, so 7:00 AM Sydney is 9:00 PM UTC on the previous calendar day. Railway does not apply Australia/Sydney daylight-saving conversion automatically; the UTC cron expression must be adjusted manually if exact local time matters across summer.
+After a notification is successfully sent through at least one enabled channel, the related matches are marked with `notified_at` so they are not sent repeatedly the next day. If ClickSend rejects a send request, those matches are not marked as notified, which allows a later retry after the configuration issue is fixed.
 
-| Desired Sydney run time | AEST UTC cron | AEDT UTC cron | Notes |
-|---|---|---|---|
-| 6:00 AM Sydney | `0 20 * * *` | `0 19 * * *` | Runs the previous UTC evening. |
-| 7:00 AM Sydney | `0 21 * * *` | `0 20 * * *` | Recommended default if buyers check results in the morning. |
-| 8:00 AM Sydney | `0 22 * * *` | `0 21 * * *` | Later morning option. |
-| 9:00 AM Sydney | `0 23 * * *` | `0 22 * * *` | Suitable if you want business-hours monitoring. |
-
-My recommendation is to start with **7:00 AM Sydney daily**, using `0 21 * * *` while Sydney is on AEST. Revisit the cron expression before daylight saving starts if the exact local time matters.
+| Channel | When it sends | Safety condition |
+|---|---|---|
+| Email | New unnotified matches and `dailyEmail` is not disabled | Requires user email and ClickSend email configuration. |
+| SMS | New unnotified matches and `hotSms=true` | Requires SMS consent, mobile number, and ClickSend SMS configuration. |
 
 ## Step-by-Step Railway UI Guidance
 
-In Railway, create the scheduler as a separate service rather than changing the current `buyersbrief.com.au` web service. This avoids accidentally replacing the live website process.
+Create two new Railway services in the same project. They should use the same GitHub repository and branch as the main website, but they should not have public domains.
 
-| Step | Action |
+| Step | Matching service: `buyersbrief-daily-match` |
 |---|---|
-| 1 | In the Railway project canvas, select **New** or **Add Service**. |
+| 1 | In the Railway project canvas, choose **New** or **Add Service**. |
 | 2 | Choose **GitHub Repo** and select `dontsellreferrer/buyersbrief.com.au`. |
-| 3 | Name the new service `buyersbrief-daily-search`. |
+| 3 | Name the service `buyersbrief-daily-match`. |
 | 4 | Set the connected branch to `main`. |
-| 5 | In the new service settings, set the start command to `pnpm scheduler`. |
-| 6 | In the new service variables, add or share `DATABASE_URL`, `OPENAI_API_KEY`, and `NODE_ENV=production`. Optionally add `OPENAI_SEARCH_MODEL`, `LLM_TIMEOUT_MS`, `SCHEDULER_BRIEF_LIMIT`, and `SCHEDULER_DELAY_MS`. |
-| 7 | In the new service settings, locate **Cron Schedule** and enter the chosen UTC cron expression, for example `0 21 * * *` for 7:00 AM Sydney during AEST. |
-| 8 | Deploy the scheduler service. Confirm logs show the scheduler starts, processes briefs, prints `buyersbrief_daily_search_complete`, and exits. |
+| 5 | Set the start command to `pnpm scheduler:match`. |
+| 6 | Add/share `DATABASE_URL`, `OPENAI_API_KEY`, and `NODE_ENV=production`. Optionally add `OPENAI_SEARCH_MODEL`, `LLM_TIMEOUT_MS`, `SCHEDULER_BRIEF_LIMIT`, and `SCHEDULER_DELAY_MS`. |
+| 7 | Set the cron schedule to `0 17 * * *` while Sydney is on AEST for a 3:00 AM Sydney run. |
+| 8 | Deploy the service and confirm logs show `buyersbrief_daily_match_complete`, then the process exits. |
+
+| Step | Notification service: `buyersbrief-daily-notify` |
+|---|---|
+| 1 | In the same Railway project canvas, choose **New** or **Add Service** again. |
+| 2 | Choose **GitHub Repo** and select `dontsellreferrer/buyersbrief.com.au`. |
+| 3 | Name the service `buyersbrief-daily-notify`. |
+| 4 | Set the connected branch to `main`. |
+| 5 | Set the start command to `pnpm scheduler:notify`. |
+| 6 | Add/share `DATABASE_URL`, `NODE_ENV=production`, `CLICKSEND_USERNAME`, and `CLICKSEND_API_KEY`. Add `CLICKSEND_FROM_EMAIL_ADDRESS_ID` if available, and optionally `CLICKSEND_SMS_FROM`. |
+| 7 | Set the cron schedule to `0 22 * * *` while Sydney is on AEST for an 8:00 AM Sydney run. |
+| 8 | Deploy the service and confirm logs show `buyersbrief_daily_notify_complete`, then the process exits. |
 
 ## Important Guardrails
 
-Do not add a cron schedule to the current public website service unless Railway supports overriding the command for a separate execution context. The public service must continue running `pnpm start`; if its command is changed to `pnpm scheduler`, the public website could stop serving traffic.
+Do not add either cron schedule to the current public website service if doing so requires replacing its start command. The public service must continue running `pnpm start`; if its command is changed to a scheduler command, the public website could stop serving traffic.
 
-Do not remove `OPENAI_API_KEY`, `DATABASE_URL`, `JWT_SECRET`, or `NODE_ENV` from the main web service. The deprecated provider variables shown in Railway should be removed only after the cleanup deployment is verified and the live site remains healthy.
+Do not use `pnpm scheduler:all` for normal production scheduling. It exists for emergency/manual verification only. Running it as a daily cron would defeat the purpose of separating early matching from 8:00 AM user-facing notification dispatch.
+
+Do not remove `OPENAI_API_KEY`, `DATABASE_URL`, `JWT_SECRET`, or `NODE_ENV` from the main web service. If old unused provider variables remain visible in Railway, remove them only after the cleanup deployment is verified and the live site remains healthy.
 
 ## References
 
