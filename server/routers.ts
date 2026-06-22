@@ -29,6 +29,7 @@ import {
   updateUserTier,
 } from "./db";
 import { generateCmaForMatch } from "./services/cma";
+import { pushConciergeLead } from "./services/referrer";
 import { generateAISearchMatchesForBrief, runAISearchForBrief, saveAISearchMatchesForBrief, type AISearchMatchPayload } from "./services/search";
 import type { Brief } from "../drizzle/schema";
 
@@ -617,13 +618,36 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const user = ensureCurrentUser(ctx);
+        
+        // Fetch the entry first to check if T3 was already requested
+        const existing = await getHotlistEntryWithMatch(input.id, user.id);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Hotlist entry not found" });
+
         const entry = await updateHotlistEntry(input.id, user.id, {
           inspectionNote: input.inspectionNote ?? undefined,
           tier3Requested: input.tier3Requested,
           tier3MaxPrice: input.tier3MaxPrice ?? undefined,
           tier2Requested: input.tier2Requested,
         });
+        
         if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: "Hotlist entry not found" });
+
+        // Trigger Referrer Concierge push if T3 is newly requested
+        if (input.tier3Requested && !existing.hotlist.tier3Requested) {
+          const maxPrice = input.tier3MaxPrice || existing.hotlist.tier3MaxPrice || 0;
+          if (maxPrice > 0 && existing.match) {
+            // Non-blocking background push
+            pushConciergeLead({
+              client_name: `${user.firstName} ${user.lastName || ""}`.trim(),
+              client_email: user.email,
+              client_mobile: user.mobile || "",
+              property_address: existing.match.address,
+              max_price: maxPrice,
+              source_ref_id: entry.id.toString()
+            }).catch(err => console.error("[Referrer] Background push failed", err));
+          }
+        }
+
         return { success: true, entry };
       }),
 
