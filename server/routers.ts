@@ -27,6 +27,7 @@ import {
   updateLastSignedIn,
   updateUserNotificationPrefs,
   updateUserTier,
+  getUserById,
 } from "./db";
 import { generateCmaForMatch } from "./services/cma";
 import { pushConciergeLead } from "./services/referrer";
@@ -636,15 +637,19 @@ export const appRouter = router({
         if (input.tier3Requested && !existing.hotlist.tier3Requested) {
           const maxPrice = input.tier3MaxPrice || existing.hotlist.tier3MaxPrice || 0;
           if (maxPrice > 0 && existing.match) {
-            // Non-blocking background push
-            pushConciergeLead({
-              client_name: `${user.firstName} ${user.lastName || ""}`.trim(),
-              client_email: user.email,
-              client_mobile: user.mobile || "",
-              property_address: existing.match.address,
-              max_price: maxPrice,
-              source_ref_id: entry.id.toString()
-            }).catch(err => console.error("[Referrer] Background push failed", err));
+            // Fetch full user profile for lead payload (ctx user only carries id)
+            const matchRef = existing.match;
+            getUserById(user.id).then(fullUser => {
+              if (!fullUser) return;
+              pushConciergeLead({
+                client_name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
+                client_email: fullUser.email,
+                client_mobile: fullUser.mobile || "",
+                property_address: matchRef.address,
+                max_price: maxPrice,
+                source_ref_id: entry.id.toString()
+              }).catch(err => console.error("[Referrer] Background push failed", err));
+            }).catch(err => console.error("[Referrer] Failed to fetch user for lead push", err));
           }
         }
 
