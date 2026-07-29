@@ -8,6 +8,8 @@ import { createContext } from "./context";
 import { ensureProductionSchema } from "../db";
 import { serveStatic, setupVite } from "./vite";
 import { registerSearchApi } from "../searchApi";
+import { registerCddApi } from "../cddApi";
+import path from "path";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -48,6 +50,15 @@ async function startServer() {
   );
 
   registerSearchApi(app);
+  registerCddApi(app);
+
+  // Serve CDD feature as a clean static page to preserve prototype CSS
+  app.get("/cdd", (_req, res) => {
+    const filePath = process.env.NODE_ENV === "development"
+      ? path.resolve(process.cwd(), "client", "public", "cdd-feature.html")
+      : path.resolve(process.cwd(), "dist", "public", "cdd-feature.html");
+    res.sendFile(filePath);
+  });
 
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
