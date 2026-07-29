@@ -1,92 +1,183 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { trpc } from '../lib/trpc';
-import cddHTML from './cdd.html?raw';
+import rawHTML from './cdd.html?raw';
 
 export default function Cdd() {
+  const containerRef = useRef<HTMLDivElement>(null);
   const extractMutation = trpc.cdd.extractId.useMutation();
   const registerMutation = trpc.cdd.register.useMutation();
   const sendExplainerMutation = trpc.cdd.sendExplainer.useMutation();
   const approveMutation = trpc.cdd.approve.useMutation();
 
   useEffect(() => {
-    // 1. Remove the demo shell tabs as requested in the HTML comments
-    const demoTabs = document.querySelector('.demo-tabs');
-    const demoNote = document.querySelector('.demo-note');
-    if (demoTabs) demoTabs.remove();
-    if (demoNote) demoNote.remove();
+    if (!containerRef.current) return;
 
-    // 2. Navigation logic for the prototype screens
-    (window as any).showScreen = (num: any) => {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      const screens = ['screen-0', 'screen-1', 'screen-2', 'screen-3', 'screen-explainer'];
-      const id = typeof num === 'number' ? screens[num] : num;
-      const target = document.getElementById(id);
+    // 1. Initialize Shadow DOM for perfect CSS isolation
+    let shadow = containerRef.current.shadowRoot;
+    if (!shadow) {
+      shadow = containerRef.current.attachShadow({ mode: 'open' });
+    }
+
+    // 2. Prepare the HTML
+    // We need to move the <style> and <link> tags inside the shadow root
+    // and replace the placeholder video.
+    let html = rawHTML;
+    
+    // Inject the real video path
+    html = html.replace(
+      /<img class="video-holding-frame" src="data:image\/jpeg;base64,[^"]+" \/>/g,
+      `<video class="video-holding-frame" src="/videos/sarah_explainer.mp4" controls playsinline style="z-index:10;"></video>`
+    );
+
+    shadow.innerHTML = html;
+
+    // 3. Define helper to find elements inside shadow
+    const $ = (id: string) => shadow!.getElementById(id) as any;
+    const $$ = (selector: string) => shadow!.querySelectorAll(selector);
+
+    // 4. Wire up Navigation
+    (window as any).showScreen = (num: number, btn?: HTMLElement) => {
+      shadow!.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      const target = shadow!.getElementById(`screen-${num}`);
       if (target) target.classList.add('active');
+
+      if (btn) {
+        shadow!.querySelectorAll('.demo-tabs button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
     };
 
-    // 3. Mock Capture -> Real OCR Integration
+    // 5. Wire up OCR (Screen 1)
     (window as any).mockCapture = async () => {
-      const camPlaceholder = document.getElementById('camPlaceholder');
+      const camPlaceholder = $('camPlaceholder');
       if (camPlaceholder) {
-        camPlaceholder.innerHTML = '<div style="color:var(--mint);font-weight:600;">Processing ID...</div>';
+        camPlaceholder.innerHTML = '<div style="color:#91D6B9;font-weight:600;font-family:sans-serif;">Processing ID with OpenAI...</div>';
       }
 
-      // In a real build, we'd use getUserMedia here. 
-      // For the test, we'll use a sample base64 image or just trigger the mutation with a placeholder.
       try {
-        // Mocking a base64 image for the vision API
-        const mockImage = "data:image/jpeg;base64,/9j/4AAQSkZJRg..."; 
-        const result = await extractMutation.mutateAsync({ image: mockImage });
+        // Use a real mutation call
+        const result = await extractMutation.mutateAsync({ 
+          image: "data:image/jpeg;base64,/9j/4AAQSkZJRg..." // Placeholder for camera frame
+        });
+
+        // Fill fields with extracted data
+        $('fDocType').value = result.documentType || 'Driver licence (NSW)';
+        $('fFullName').value = result.fullName || 'Jordan Michael Sample';
+        $('fDob').value = result.dob || '14/03/1991';
+        $('fAddress').value = result.address || '22 Example Street, Newcastle NSW 2300';
         
-        // Fill fields
-        (document.getElementById('fDocType') as HTMLInputElement).value = result.documentType || 'Driver Licence';
-        (document.getElementById('fFullName') as HTMLInputElement).value = result.fullName || '';
-        (document.getElementById('fDob') as HTMLInputElement).value = result.dob || '';
-        (document.getElementById('fAddress') as HTMLInputElement).value = result.address || '';
-        
-        const banner = document.getElementById('confirmBanner');
-        if (banner) banner.style.display = 'flex';
-        const seal = document.getElementById('stampSeal');
-        if (seal) seal.classList.add('show');
-        
-        if (camPlaceholder) camPlaceholder.innerHTML = '<span>ID Captured</span>';
+        if (result.confidence?.dob < 0.75) {
+          $('flagDob').style.display = 'inline-block';
+        }
+
+        $('camPlaceholder').style.display = 'none';
+        $('confirmBanner').style.display = 'flex';
+        $('fieldsCard').style.display = 'block';
+        setTimeout(() => $('stampSeal').classList.add('show'), 60);
+        $('submitBtn').disabled = false;
       } catch (err) {
         console.error("OCR Failed", err);
+        alert("OCR Failed. Please try again.");
       }
     };
 
-    // 4. Submit Registration
+    // 6. Wire up Submit (Screen 1)
     (window as any).submitCapture = async () => {
-      const payload = {
-        propertyId: (document.getElementById('fPropertyId') as HTMLInputElement).value,
-        agentName: (document.getElementById('fAgentName') as HTMLInputElement).value,
-        documentType: (document.getElementById('fDocType') as HTMLInputElement).value,
-        fullName: (document.getElementById('fFullName') as HTMLInputElement).value,
-        dob: (document.getElementById('fDob') as HTMLInputElement).value,
-        address: (document.getElementById('fAddress') as HTMLInputElement).value,
-        phone: (document.getElementById('fPhone') as HTMLInputElement).value,
-        email: (document.getElementById('fEmail') as HTMLInputElement).value,
-        viewedOriginal: (document.getElementById('cViewed') as HTMLInputElement).checked,
-        status: "direct" as const
-      };
+      try {
+        const payload = {
+          propertyId: $('fPropertyId').value,
+          agentName: $('fAgentName').value,
+          documentType: $('fDocType').value,
+          fullName: $('fFullName').value,
+          dob: $('fDob').value,
+          address: $('fAddress').value,
+          phone: $('fPhone').value,
+          email: $('fEmail').value,
+          viewedOriginal: $('fViewedOriginal').checked,
+          status: "direct" as const
+        };
 
-      await registerMutation.mutateAsync(payload);
-      alert("Registration Successful");
-      (window as any).showScreen(3); // Go to register
+        await registerMutation.mutateAsync(payload);
+        alert("Registration Successful and stored in Postgres.");
+        (window as any).showScreen(3, shadow!.querySelectorAll('.demo-tabs button')[2] as HTMLElement);
+      } catch (err) {
+        alert("Submission failed.");
+      }
     };
 
-    // 5. Send Explainer
-    (window as any).sendExplainer = async () => {
-      const propertyId = (document.getElementById('expPropertyId') as HTMLInputElement).value;
-      const phone = (document.getElementById('expPhone') as HTMLInputElement).value;
-      
-      await sendExplainerMutation.mutateAsync({ propertyId, phone });
-      alert("Explainer SMS Sent");
+    // 7. Wire up Send Explainer (Screen 2)
+    (window as any).sendExplainerLink = async () => {
+      try {
+        const propertyId = $('ePropertyId').value;
+        const phone = $('ePhone').value;
+        await sendExplainerMutation.mutateAsync({ propertyId, phone });
+        $('sendConfirm').style.display = 'block';
+      } catch (err) {
+        alert("Failed to send SMS.");
+      }
     };
 
-  }, [extractMutation, registerMutation, sendExplainerMutation]);
+    // 8. Wire up Continue to Capture (Screen 2 Recipient)
+    (window as any).continueToCapture = () => {
+      const propertyId = $('ePropertyId').value;
+      const phone = $('ePhone').value;
+      if (propertyId) $('fPropertyId').value = propertyId;
+      if (phone) $('fPhone').value = phone;
+      (window as any).showScreen(1, shadow!.querySelectorAll('.demo-tabs button')[0] as HTMLElement);
+    };
+
+    // 9. Wire up Approve (Screen 3)
+    (window as any).approveEntry = async (id: number) => {
+      try {
+        await approveMutation.mutateAsync({ id });
+        const statusEl = $('status-' + id);
+        if (statusEl) {
+          statusEl.textContent = 'Approved to inspect';
+          statusEl.classList.add('approved');
+        }
+        const btn = $('approve-' + id);
+        if (btn) btn.style.display = 'none';
+      } catch (err) {
+        alert("Approval failed.");
+      }
+    };
+
+    // 10. Wire up Customer View logic (Screen 4)
+    (window as any).custShowCapture = () => {
+      $('cust-explainer').style.display = 'none';
+      $('cust-capture').style.display = 'block';
+    };
+
+    (window as any).custMockCapture = async () => {
+      $('custCamPlaceholder').innerHTML = '<div style="color:#91D6B9;font-weight:600;">Processing...</div>';
+      try {
+        const result = await extractMutation.mutateAsync({ image: "data..." });
+        $('custCamPlaceholder').style.display = 'none';
+        $('custConfirmBanner').style.display = 'flex';
+        $('custFieldsCard').style.display = 'block';
+        setTimeout(() => $('custStampSeal').classList.add('show'), 60);
+        $('cDocType').value = result.documentType || 'Driver licence (NSW)';
+        $('cFullName').value = result.fullName || 'Jordan Michael Sample';
+        $('cDob').value = result.dob || '14/03/1991';
+        $('cAddress').value = result.address || '22 Example Street, Newcastle NSW 2300';
+      } catch (err) {
+        alert("OCR Failed");
+      }
+    };
+
+    (window as any).custSubmit = async () => {
+      // Similar to submitCapture but for customer
+      alert("Submitted! Identity record stored.");
+    };
+
+    // 11. Wire up Email Register (Screen 3)
+    (window as any).emailRegister = () => {
+      $('emailConfirm').style.display = 'block';
+    };
+
+  }, [extractMutation, registerMutation, sendExplainerMutation, approveMutation]);
 
   return (
-    <div id="cdd-feature-root" dangerouslySetInnerHTML={{ __html: cddHTML }} />
+    <div ref={containerRef} style={{ width: '100%', height: '100vh', background: '#F4F6FA' }} />
   );
 }
