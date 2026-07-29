@@ -175,17 +175,6 @@
     width: 100%;
   }
   .field-value:focus { outline: 2px solid var(--ink-soft); outline-offset: 1px; }
-  .flag {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    background: var(--amber-soft);
-    color: var(--amber);
-    padding: 2px 7px;
-    border-radius: 999px;
-    display: none;
-  }
 
   /* ---------- Screen 1: capture ---------- */
   .cam-wrap {
@@ -193,13 +182,22 @@
     border-radius: 14px;
     overflow: hidden;
     background: #0B1220;
-    height: 35vh; /* Larger FOV as requested */
+    height: 45vh; /* Even larger FOV as requested */
+    min-height: 350px;
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  .cam-wrap video, .cam-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam-wrap video { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
   .cam-placeholder {
     position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -237,22 +235,22 @@
     background: var(--ink);
     aspect-ratio: 16/9;
     position: relative;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff;
     overflow: hidden;
+    display: block;
   }
   .video-element {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    z-index: 1;
+    display: block;
+    background: #000;
   }
   .lower-third {
     position: absolute; left: 0; right: 0; bottom: 0;
     display: flex; align-items: center; gap: 8px;
     padding: 10px 14px 12px;
     background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0) 100%);
-    z-index: 6;
+    z-index: 10;
     pointer-events: none;
   }
   .lower-third .lt-mark {
@@ -270,8 +268,6 @@
     font-family: var(--display); font-weight: 700; font-size: 13px;
     color: var(--mint); letter-spacing: 0.01em;
   }
-  .reasons { margin: 4px 16px 0; }
-  .reasons li { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -307,7 +303,7 @@
     </div>
 
     <div class="cam-wrap" id="camWrap">
-      <video id="idCamera" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+      <video id="idCamera" autoplay playsinline muted></video>
       <div class="cam-placeholder" id="camPlaceholder">
         <button class="btn btn-primary" style="width:auto;padding:10px 18px;" onclick="startCamera()">Turn on Camera</button>
       </div>
@@ -370,8 +366,10 @@
     </div>
 
     <div class="video-card">
-      <!-- Standard controls for maximum compatibility -->
-      <video class="video-element" id="sarahVideo" src="/videos/sarah_explainer.mp4" controls playsinline preload="auto" style="z-index:5;"></video>
+      <video class="video-element" id="sarahVideo" controls playsinline preload="auto">
+        <source src="/videos/sarah_explainer.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
       <div class="lower-third">
         <div class="lt-mark">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08s5.97 1.09 6 3.08c-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
@@ -434,7 +432,7 @@
         <h1>Capture ID</h1>
       </div>
       <div class="cam-wrap">
-        <video id="custCamera" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+        <video id="custCamera" autoplay playsinline muted></video>
         <div class="cam-placeholder" id="custCamPlaceholder">
           <button class="btn btn-primary" onclick="startCustomerCamera()">Turn on Camera</button>
         </div>
@@ -480,7 +478,7 @@
   async function startCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, 
+        video: { facingMode: "environment" }, 
         audio: false 
       });
       const video = document.getElementById('idCamera');
@@ -496,7 +494,7 @@
   async function startCustomerCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, 
+        video: { facingMode: "user" }, 
         audio: false 
       });
       const video = document.getElementById('custCamera');
@@ -544,10 +542,6 @@
       document.getElementById('fDob').value = data.dob || '';
       document.getElementById('fAddress').value = data.address || '';
       
-      if (data.confidence && data.confidence.dob < 0.75) {
-        document.getElementById('flagDob').style.display = 'inline-block';
-      }
-      
       document.getElementById('confirmBanner').style.display = 'flex';
       document.getElementById('fieldsCard').style.display = 'block';
       document.getElementById('stampSeal').classList.add('show');
@@ -574,16 +568,19 @@
     };
     
     try {
-      await fetch('/api/cdd/register', {
+      const res = await fetch('/api/cdd/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      
       alert('Identity registered successfully!');
       loadRegister();
       showScreen(3, document.querySelectorAll('.demo-tabs button')[2]);
     } catch (e) {
-      alert('Failed to register.');
+      alert('Failed to register: ' + e.message);
     }
   }
 
@@ -613,20 +610,22 @@
       const data = await res.json();
       const list = document.getElementById('registerList');
       list.innerHTML = '';
-      document.getElementById('entryCount').textContent = data.length + ' entries';
+      document.getElementById('entryCount').textContent = (data.length || 0) + ' entries';
       
-      data.forEach(entry => {
-        const row = document.createElement('div');
-        row.className = 'row';
-        row.innerHTML = `
-          <div class="row-main">
-            <div class="name">${entry.fullName || 'Pending'}</div>
-            <div class="meta">${entry.documentType || '---'} • ${entry.propertyId}</div>
-          </div>
-          <span class="status ${entry.status}">${entry.status}</span>
-        `;
-        list.appendChild(row);
-      });
+      if (Array.isArray(data)) {
+        data.forEach(entry => {
+          const row = document.createElement('div');
+          row.className = 'row';
+          row.innerHTML = `
+            <div class="row-main">
+              <div class="name">${entry.fullName || 'Pending'}</div>
+              <div class="meta">${entry.documentType || '---'} • ${entry.propertyId}</div>
+            </div>
+            <span class="status ${entry.status}">${entry.status}</span>
+          `;
+          list.appendChild(row);
+        });
+      }
     } catch (e) {}
   }
 

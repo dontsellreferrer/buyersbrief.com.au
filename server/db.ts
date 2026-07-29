@@ -28,8 +28,10 @@ let _db: ReturnType<typeof drizzle> | null = null;
 // Lazily create the drizzle instance so local tooling can run without a DB.
 // POSTGRES_URL takes priority (set in Railway). Falls back to DATABASE_URL if it's a postgres:// URL.
 function getConnectionUrl(): string | undefined {
-  if (process.env.POSTGRES_URL) return process.env.POSTGRES_URL;
-  if (process.env.DATABASE_URL?.startsWith("postgres")) return process.env.DATABASE_URL;
+  const url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.DB_URL;
+  if (url?.startsWith("postgres")) return url;
+  
+  console.warn("[Database] Debug - Available Env Vars:", Object.keys(process.env).filter(k => k.includes("URL") || k.includes("POSTGRES") || k.includes("DATABASE")));
   return undefined;
 }
 
