@@ -14,6 +14,7 @@ import Terms from "./pages/Terms";
 import Disclaimer from "./pages/Disclaimer";
 import Dashboard from "./pages/Dashboard";
 import CMA from "./pages/CMA";
+import Cdd from "./pages/Cdd";
 
 
 function Router() {
@@ -31,6 +32,10 @@ function Router() {
       <Route path={"/cma/:suburbSlug/:addressSlug"} component={CMA} />
       <Route path={"/cma/:property"} component={CMA} />
       <Route path={"/cma"} component={CMA} />
+      <Route path={"/cdd"} component={Cdd} />
+      <Route path={"/cdd/explainer"} component={Cdd} />
+      <Route path={"/cdd/register"} component={Cdd} />
+      <Route path={"/cdd/customer"} component={Cdd} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -16,6 +16,9 @@ import {
   hotlist,
   matches,
   users,
+  cddRegister,
+  CddEntry,
+  InsertCddEntry,
 } from "../drizzle/schema";
 
 type PostgresClient = ReturnType<typeof postgres>;
@@ -877,5 +880,43 @@ export async function updateUserNotificationPrefs(
     .where(eq(users.id, userId))
     .returning();
 
+  return result.length > 0 ? result[0] : null;
+}
+
+/**
+ * CDD Register Helpers
+ */
+export async function createCddEntry(data: InsertCddEntry): Promise<CddEntry | null> {
+  const db = getDb();
+  if (!db) return null;
+  const result = await db.insert(cddRegister).values(data).returning();
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function getCddEntries(propertyId?: string): Promise<CddEntry[]> {
+  const db = getDb();
+  if (!db) return [];
+  const query = db.select().from(cddRegister);
+  if (propertyId) {
+    return await query.where(eq(cddRegister.propertyId, propertyId)).orderBy(desc(cddRegister.createdAt));
+  }
+  return await query.orderBy(desc(cddRegister.createdAt));
+}
+
+export async function getCddEntryByToken(token: string): Promise<CddEntry | null> {
+  const db = getDb();
+  if (!db) return null;
+  const result = await db.select().from(cddRegister).where(eq(cddRegister.token, token)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateCddEntry(id: number, data: Partial<InsertCddEntry>): Promise<CddEntry | null> {
+  const db = getDb();
+  if (!db) return null;
+  const result = await db
+    .update(cddRegister)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(cddRegister.id, id))
+    .returning();
   return result.length > 0 ? result[0] : null;
 }

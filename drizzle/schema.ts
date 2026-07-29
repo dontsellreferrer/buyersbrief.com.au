@@ -192,3 +192,28 @@ export const cmas = pgTable("cmas", {
 
 export type Cma = typeof cmas.$inferSelect;
 export type InsertCma = typeof cmas.$inferInsert;
+
+/**
+ * CDD Register — Customer Due Diligence identity capture.
+ */
+export const cddStatusEnum = pgEnum("cdd_status", ["direct", "sent", "completed", "approved"]);
+
+export const cddRegister = pgTable("cdd_register", {
+  id: serial("id").primaryKey(),
+  propertyId: text("property_id").notNull(),
+  agentName: text("agent_name"),
+  documentType: text("document_type"),
+  fullName: text("full_name"),
+  dob: text("dob"),
+  address: text("address"),
+  phone: text("phone"),
+  email: text("email"),
+  viewedOriginal: boolean("viewed_original").default(false).notNull(),
+  status: cddStatusEnum("status").default("direct").notNull(),
+  token: text("token").unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type CddEntry = typeof cddRegister.$inferSelect;
+export type InsertCddEntry = typeof cddRegister.$inferInsert;
