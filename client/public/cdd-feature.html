@@ -113,14 +113,6 @@
     border-radius: 4px;
     margin-left: auto;
   }
-  .topbar .eyebrow {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--mint);
-    margin: 0 0 4px;
-  }
   .topbar h1 {
     font-family: var(--display);
     font-weight: 600;
@@ -209,12 +201,14 @@
     position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     color: #9FB0CC; font-size: 13px; gap: 10px; text-align: center; padding: 0 30px;
+    z-index: 5;
   }
   .cam-guide {
     position: absolute; inset: 14%;
     border: 2px dashed rgba(255,255,255,0.35);
     border-radius: 10px;
     pointer-events: none;
+    z-index: 10;
   }
   .stamp-seal {
     width: 46px; height: 46px; border-radius: 50%;
@@ -223,6 +217,7 @@
     color: var(--ink); font-size: 20px; font-weight: 700; flex-shrink: 0;
     transform: scale(0);
     transition: transform 0.35s cubic-bezier(.34,1.56,.64,1);
+    z-index: 20;
   }
   .stamp-seal.show { transform: scale(1); }
   .confirm-banner {
@@ -307,13 +302,6 @@
   .status.approved { background: var(--ink); color: #fff; }
   .status.direct { background: #E7EAF3; color: var(--ink-soft); }
   .status.sent { background: var(--amber-soft); color: var(--amber); }
-  .viewed-tag {
-    font-size: 10.5px; font-weight: 600; margin-top: 5px;
-    display: block;
-  }
-  .viewed-tag.yes { color: var(--verified); }
-  .viewed-tag.no { color: var(--amber); }
-  .time { font-size: 11px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -349,16 +337,20 @@
     </div>
 
     <div class="cam-wrap" id="camWrap">
+      <video id="idCamera" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
       <div class="cam-placeholder" id="camPlaceholder">
-        <span>Align ID within frame</span>
-        <button class="btn btn-primary" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="mockCapture()">Capture Photo</button>
+        <button class="btn btn-primary" style="width:auto;padding:10px 18px;" onclick="startCamera()">Turn on Camera</button>
       </div>
       <div class="cam-guide"></div>
+      <div class="stamp-seal" id="stampSeal" style="position:absolute; top:20px; right:20px;">✓</div>
     </div>
 
     <div class="confirm-banner" id="confirmBanner">
-      <div class="stamp-seal" id="stampSeal">✓</div>
       <span>Details extracted — verify below.</span>
+    </div>
+
+    <div style="padding: 14px 16px;">
+       <button class="btn btn-primary" id="captureBtn" onclick="captureAndExtract()" style="display:none;">Capture Photo</button>
     </div>
 
     <div class="card" id="fieldsCard" style="display:none;">
@@ -409,7 +401,7 @@
 
     <div class="video-card">
       <div class="play-btn-overlay" id="playBtn" onclick="playVideo()">▶</div>
-      <video class="video-element" id="sarahVideo" src="/videos/sarah_explainer.mp4" playsinline preload="metadata"></video>
+      <video class="video-element" id="sarahVideo" src="/videos/sarah_explainer.mp4" playsinline preload="auto"></video>
       <div class="lower-third">
         <div class="lt-mark">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08s5.97 1.09 6 3.08c-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
@@ -449,13 +441,6 @@
 
     <div id="registerList">
       <!-- Dynamic list -->
-      <div class="row">
-        <div class="row-main">
-          <div class="name">Sarah Jenkins</div>
-          <div class="meta">NSW DL • 28 Bond St</div>
-        </div>
-        <span class="status completed">Verified</span>
-      </div>
     </div>
 
     <div style="padding: 20px 16px;">
@@ -479,9 +464,13 @@
         <h1>Capture ID</h1>
       </div>
       <div class="cam-wrap">
+        <video id="custCamera" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
         <div class="cam-placeholder" id="custCamPlaceholder">
-          <button class="btn btn-primary" onclick="custMockCapture()">Take Photo</button>
+          <button class="btn btn-primary" onclick="startCustomerCamera()">Turn on Camera</button>
         </div>
+      </div>
+      <div style="padding: 14px 16px;">
+         <button class="btn btn-primary" id="custCaptureBtn" onclick="custCaptureAndExtract()" style="display:none;">Capture Photo</button>
       </div>
       <div class="card" id="custFieldsCard" style="display:none;">
          <div class="field-label">Name</div>
@@ -492,7 +481,11 @@
   </section>
 </div>
 
+<canvas id="captureCanvas" style="display:none;"></canvas>
+
 <script>
+  let currentStream = null;
+
   function showScreen(num, btn) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen-' + num).classList.add('active');
@@ -502,6 +495,11 @@
       btn.classList.add('active');
     }
     
+    // Stop camera if moving away from capture screens
+    if (num !== 1 && num !== 4) {
+      stopCamera();
+    }
+
     // Pause video if moving away from screen 2
     if (num !== 2) {
       const video = document.getElementById('sarahVideo');
@@ -513,40 +511,95 @@
   function playVideo() {
     const video = document.getElementById('sarahVideo');
     const playBtn = document.getElementById('playBtn');
-    video.play();
+    video.play().catch(e => {
+      console.error("Video play failed:", e);
+      alert("Please tap again to play video.");
+    });
     playBtn.style.display = 'none';
     video.controls = true;
   }
 
-  async function mockCapture() {
-    const placeholder = document.getElementById('camPlaceholder');
-    placeholder.innerHTML = '<span style="color:var(--mint);font-weight:700;">PROCESSING ID...</span>';
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "environment" }, 
+        audio: false 
+      });
+      const video = document.getElementById('idCamera');
+      video.srcObject = stream;
+      currentStream = stream;
+      document.getElementById('camPlaceholder').style.display = 'none';
+      document.getElementById('captureBtn').style.display = 'block';
+    } catch (e) {
+      alert("Camera access denied or not available.");
+    }
+  }
+
+  async function startCustomerCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "user" }, 
+        audio: false 
+      });
+      const video = document.getElementById('custCamera');
+      video.srcObject = stream;
+      currentStream = stream;
+      document.getElementById('custCamPlaceholder').style.display = 'none';
+      document.getElementById('custCaptureBtn').style.display = 'block';
+    } catch (e) {
+      alert("Camera access denied.");
+    }
+  }
+
+  function stopCamera() {
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+      currentStream = null;
+    }
+  }
+
+  async function captureAndExtract() {
+    const video = document.getElementById('idCamera');
+    const canvas = document.getElementById('captureCanvas');
+    const context = canvas.getContext('2d');
     
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    const captureBtn = document.getElementById('captureBtn');
+    captureBtn.disabled = true;
+    captureBtn.textContent = 'EXTRACTING...';
+
     try {
       const res = await fetch('/api/cdd/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: 'data:image/jpeg;base64,/9j/4AAQSkZJRg...' })
+        body: JSON.stringify({ image: imageData })
       });
       const data = await res.json();
       
-      document.getElementById('fDocType').value = data.documentType || 'Driver licence (NSW)';
-      document.getElementById('fFullName').value = data.fullName || 'Jordan Michael Sample';
-      document.getElementById('fDob').value = data.dob || '14/03/1991';
-      document.getElementById('fAddress').value = data.address || '22 Example Street, Newcastle NSW 2300';
+      document.getElementById('fDocType').value = data.documentType || '';
+      document.getElementById('fFullName').value = data.fullName || '';
+      document.getElementById('fDob').value = data.dob || '';
+      document.getElementById('fAddress').value = data.address || '';
       
       if (data.confidence && data.confidence.dob < 0.75) {
         document.getElementById('flagDob').style.display = 'inline-block';
       }
       
-      placeholder.style.display = 'none';
       document.getElementById('confirmBanner').style.display = 'flex';
       document.getElementById('fieldsCard').style.display = 'block';
       document.getElementById('stampSeal').classList.add('show');
       document.getElementById('submitBtn').disabled = false;
+      captureBtn.textContent = 'Retake Photo';
+      captureBtn.disabled = false;
     } catch (e) {
       alert('OCR failed. Please try again.');
-      placeholder.innerHTML = '<span>Align ID within frame</span><button class="btn btn-primary" onclick="mockCapture()">Capture Photo</button>';
+      captureBtn.textContent = 'Capture Photo';
+      captureBtn.disabled = false;
     }
   }
 
@@ -624,22 +677,35 @@
     document.getElementById('cust-capture').style.display = 'block';
   }
 
-  async function custMockCapture() {
-    const placeholder = document.getElementById('custCamPlaceholder');
-    placeholder.innerHTML = '<span style="color:var(--mint);">PROCESSING...</span>';
+  async function custCaptureAndExtract() {
+    const video = document.getElementById('custCamera');
+    const canvas = document.getElementById('captureCanvas');
+    const context = canvas.getContext('2d');
     
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+
+    const btn = document.getElementById('custCaptureBtn');
+    btn.disabled = true;
+    btn.textContent = 'EXTRACTING...';
+
     try {
       const res = await fetch('/api/cdd/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: 'data:image/jpeg;base64,...' })
+        body: JSON.stringify({ image: imageData })
       });
       const data = await res.json();
       document.getElementById('cFullName').value = data.fullName || 'Jordan Michael Sample';
-      placeholder.style.display = 'none';
       document.getElementById('custFieldsCard').style.display = 'block';
+      btn.textContent = 'Retake Photo';
+      btn.disabled = false;
     } catch (e) {
       alert('OCR failed.');
+      btn.textContent = 'Capture Photo';
+      btn.disabled = false;
     }
   }
 
