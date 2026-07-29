@@ -87,6 +87,6 @@ export default function Cdd() {
   }, [extractMutation, registerMutation, sendExplainerMutation]);
 
   return (
-    <div dangerouslySetInnerHTML={{ __html: cddHTML }} />
+    <div id="cdd-feature-root" dangerouslySetInnerHTML={{ __html: cddHTML }} />
   );
 }

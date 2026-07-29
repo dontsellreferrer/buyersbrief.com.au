@@ -1,401 +1,376 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CDD Identity Capture</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --navy: #1B2B48;
-      --coral: #FF6B6B;
-      --sand: #F9F7F2;
-      --mint: #4ECDC4;
-      --mint-soft: #E8F8F7;
-      --ink: #2D3436;
-      --ink-soft: #636E72;
-      --body: 'Plus Jakarta Sans', sans-serif;
-    }
-
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { 
-      margin: 0; padding: 0; 
-      font-family: var(--body); 
-      background: #f0f2f5; 
-      color: var(--navy);
-      display: flex; justify-content: center;
-    }
-
-    /* Mobile Shell Simulation */
-    .mobile-container {
-      width: 100%;
-      max-width: 430px;
-      height: 100vh;
-      background: var(--sand);
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 0 40px rgba(0,0,0,0.1);
-    }
-
-    /* Screens */
-    .screen {
-      display: none;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
-      animation: fadeIn 0.3s ease-out;
-    }
-    .screen.active { display: flex; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Header */
-    header {
-      padding: 20px 20px 10px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .logo-mark {
-      width: 32px; height: 32px;
-      background: var(--navy);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-weight: 800; font-size: 18px;
-    }
-    .header-title { font-weight: 700; font-size: 18px; letter-spacing: -0.5px; }
-
-    /* UI Components */
-    .card {
-      background: #fff;
-      margin: 10px 16px;
-      padding: 20px;
-      border-radius: 20px;
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-
-    .btn {
-      width: 100%;
-      padding: 16px;
-      border-radius: 14px;
-      border: none;
-      font-family: var(--body);
-      font-weight: 700;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-    .btn-primary { background: var(--navy); color: #fff; }
-    .btn-primary:active { transform: scale(0.98); background: #121d31; }
-    .btn-ghost { background: var(--mint-soft); color: var(--navy); }
-
-    .field-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-    .field-value { 
-      width: 100%; padding: 12px 0; 
-      font-size: 16px; font-weight: 600; 
-      border: none; border-bottom: 1.5px solid #eee;
-      margin-bottom: 20px; outline: none;
-      background: transparent;
-    }
-    .field-value:focus { border-color: var(--mint); }
-
-    /* ---------- Screen 1: Dashboard ---------- */
-    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
-    .stat-box { background: #fff; padding: 16px; border-radius: 16px; border: 1px solid rgba(0,0,0,0.05); }
-    .stat-num { font-size: 24px; font-weight: 800; display: block; }
-    .stat-label { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
-
-    .list-header { padding: 20px 20px 10px; font-weight: 700; font-size: 15px; color: var(--ink-soft); }
-    .entry { 
-      background: #fff; margin: 0 16px 8px; padding: 14px 16px; border-radius: 14px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .entry-info b { display: block; font-size: 15px; }
-    .entry-info span { font-size: 12px; color: var(--ink-soft); }
-    .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    .badge-success { background: #e8f8f0; color: #2ecc71; }
-    .badge-warn { background: #fff9e6; color: #f1c40f; }
-
-    /* ---------- Screen 2: Explainer ---------- */
-    .video-card {
-      margin: 14px 16px;
-      border-radius: 14px;
-      background: var(--ink);
-      aspect-ratio: 16/9;
-      position: relative;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff;
-      overflow: hidden;
-    }
-    .video-holding-frame {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      z-index: 1;
-    }
-    .lower-third {
-      position: absolute; left: 0; right: 0; bottom: 0;
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 14px 12px;
-      background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0) 100%);
-    }
-    .lower-third .lt-mark {
-      width: 20px; height: 20px; border-radius: 6px;
-      background: rgba(255,255,255,0.12);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 10px;
-    }
-    .lt-text b { display: block; font-size: 12px; }
-    .lt-text span { font-size: 10px; opacity: 0.8; }
-
-    /* ---------- Screen 3: Capture ---------- */
-    .cam-view {
-      margin: 16px; flex: 1;
-      background: #000; border-radius: 24px;
-      position: relative; overflow: hidden;
-      display: flex; align-items: center; justify-content: center;
-      border: 4px solid #fff;
-    }
-    .id-guide {
-      width: 85%; height: 55%;
-      border: 2px dashed rgba(255,255,255,0.5);
-      border-radius: 12px;
-      position: relative;
-    }
-    .capture-btn {
-      position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-      width: 70px; height: 70px; border-radius: 50%;
-      background: #fff; border: 5px solid rgba(255,255,255,0.3);
-      cursor: pointer;
-    }
+<style>
+  #cdd-feature-root {
+    --navy: #1B2B48;
+    --coral: #FF6B6B;
+    --sand: #F9F7F2;
+    --mint: #4ECDC4;
+    --mint-soft: #E8F8F7;
+    --ink: #2D3436;
+    --ink-soft: #636E72;
+    --body: 'Plus Jakarta Sans', sans-serif;
     
-    .stamp-seal {
-      position: absolute; top: 20px; right: 20px;
-      width: 80px; height: 80px;
-      border: 3px double var(--mint);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--mint); font-weight: 800; font-size: 10px;
-      transform: rotate(15deg) scale(2); opacity: 0;
-      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      pointer-events: none; z-index: 10;
-      background: rgba(255,255,255,0.9);
-    }
-    .stamp-seal.show { opacity: 1; transform: rotate(15deg) scale(1); }
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #f0f2f5;
+    display: flex;
+    justify-content: center;
+    font-family: var(--body);
+    color: var(--navy);
+    overflow: hidden;
+  }
 
-    .confirm-banner {
-      background: var(--mint); color: #fff;
-      padding: 12px; display: none; align-items: center; justify-content: center; gap: 8px;
-      font-weight: 700; font-size: 14px;
-    }
+  #cdd-feature-root * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-    /* ---------- Screen 4: Customer ---------- */
-    .success-hero {
-      padding: 40px 20px; text-align: center;
-    }
-    .check-circle {
-      width: 64px; height: 64px; background: var(--mint); color: #fff;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-size: 32px; margin: 0 auto 16px;
-    }
+  /* Mobile Shell Simulation */
+  #cdd-feature-root .mobile-container {
+    width: 100%;
+    max-width: 430px;
+    height: 100%;
+    background: var(--sand);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 40px rgba(0,0,0,0.1);
+  }
 
-    .footer-nav {
-      padding: 10px 16px 30px;
-      display: flex; gap: 10px;
-    }
-  </style>
-</head>
-<body>
+  /* Screens */
+  #cdd-feature-root .screen {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    animation: cddFadeIn 0.3s ease-out;
+  }
+  #cdd-feature-root .screen.active { display: flex; }
 
-  <div class="mobile-container">
+  @keyframes cddFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Header */
+  #cdd-feature-root header {
+    padding: 20px 20px 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #cdd-feature-root .logo-mark {
+    width: 32px; height: 32px;
+    background: var(--navy);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: 18px;
+  }
+  #cdd-feature-root .header-title { font-weight: 700; font-size: 18px; letter-spacing: -0.5px; }
+
+  /* UI Components */
+  #cdd-feature-root .card {
+    background: #fff;
+    margin: 10px 16px;
+    padding: 20px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+
+  #cdd-feature-root .btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 14px;
+    border: none;
+    font-family: var(--body);
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  #cdd-feature-root .btn-primary { background: var(--navy); color: #fff; }
+  #cdd-feature-root .btn-primary:active { transform: scale(0.98); background: #121d31; }
+  #cdd-feature-root .btn-ghost { background: var(--mint-soft); color: var(--navy); }
+
+  #cdd-feature-root .field-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  #cdd-feature-root .field-value { 
+    width: 100%; padding: 12px 0; 
+    font-size: 16px; font-weight: 600; 
+    border: none; border-bottom: 1.5px solid #eee;
+    margin-bottom: 20px; outline: none;
+    background: transparent;
+  }
+  #cdd-feature-root .field-value:focus { border-color: var(--mint); }
+
+  /* ---------- Screen 1: Dashboard ---------- */
+  #cdd-feature-root .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
+  #cdd-feature-root .stat-box { background: #fff; padding: 16px; border-radius: 16px; border: 1px solid rgba(0,0,0,0.05); }
+  #cdd-feature-root .stat-num { font-size: 24px; font-weight: 800; display: block; }
+  #cdd-feature-root .stat-label { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+
+  #cdd-feature-root .list-header { padding: 20px 20px 10px; font-weight: 700; font-size: 15px; color: var(--ink-soft); }
+  #cdd-feature-root .entry { 
+    background: #fff; margin: 0 16px 8px; padding: 14px 16px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #cdd-feature-root .entry-info b { display: block; font-size: 15px; }
+  #cdd-feature-root .entry-info span { font-size: 12px; color: var(--ink-soft); }
+  #cdd-feature-root .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  #cdd-feature-root .badge-success { background: #e8f8f0; color: #2ecc71; }
+  #cdd-feature-root .badge-warn { background: #fff9e6; color: #f1c40f; }
+
+  /* ---------- Screen 2: Explainer ---------- */
+  #cdd-feature-root .video-card {
+    margin: 14px 16px;
+    border-radius: 14px;
+    background: var(--ink);
+    aspect-ratio: 16/9;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    overflow: hidden;
+  }
+  #cdd-feature-root .video-holding-frame {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 1;
+  }
+  #cdd-feature-root .lower-third {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px 12px;
+    background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0) 100%);
+  }
+  #cdd-feature-root .lower-third .lt-mark {
+    width: 20px; height: 20px; border-radius: 6px;
+    background: rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  #cdd-feature-root .lt-text b { display: block; font-size: 12px; }
+  #cdd-feature-root .lt-text span { font-size: 10px; opacity: 0.8; }
+
+  /* ---------- Screen 3: Capture ---------- */
+  #cdd-feature-root .cam-view {
+    margin: 16px; flex: 1;
+    background: #000; border-radius: 24px;
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    border: 4px solid #fff;
+  }
+  #cdd-feature-root .id-guide {
+    width: 85%; height: 55%;
+    border: 2px dashed rgba(255,255,255,0.5);
+    border-radius: 12px;
+    position: relative;
+  }
+  #cdd-feature-root .capture-btn {
+    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+    width: 70px; height: 70px; border-radius: 50%;
+    background: #fff; border: 5px solid rgba(255,255,255,0.3);
+    cursor: pointer;
+  }
+  
+  #cdd-feature-root .stamp-seal {
+    position: absolute; top: 20px; right: 20px;
+    width: 80px; height: 80px;
+    border: 3px double var(--mint);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--mint); font-weight: 800; font-size: 10px;
+    transform: rotate(15deg) scale(2); opacity: 0;
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none; z-index: 10;
+    background: rgba(255,255,255,0.9);
+  }
+  #cdd-feature-root .stamp-seal.show { opacity: 1; transform: rotate(15deg) scale(1); }
+
+  #cdd-feature-root .confirm-banner {
+    background: var(--mint); color: #fff;
+    padding: 12px; display: none; align-items: center; justify-content: center; gap: 8px;
+    font-weight: 700; font-size: 14px;
+  }
+
+  /* ---------- Screen 4: Customer ---------- */
+  #cdd-feature-root .success-hero {
+    padding: 40px 20px; text-align: center;
+  }
+  #cdd-feature-root .check-circle {
+    width: 64px; height: 64px; background: var(--mint); color: #fff;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 32px; margin: 0 auto 16px;
+  }
+
+  #cdd-feature-root .footer-nav {
+    padding: 10px 16px 30px;
+    display: flex; gap: 10px;
+  }
+</style>
+
+<div class="mobile-container">
+  
+  <!-- SCREEN 1: AGENT DASHBOARD -->
+  <div class="screen active" id="screen-0">
+    <header>
+      <div class="logo-mark">B</div>
+      <div class="header-title">CDD Register</div>
+    </header>
     
-    <!-- SCREEN 1: AGENT DASHBOARD -->
-    <div class="screen active" id="screen-0">
-      <header>
-        <div class="logo-mark">B</div>
-        <div class="header-title">CDD Register</div>
-      </header>
-      
-      <div class="stat-grid">
-        <div class="stat-box">
-          <span class="stat-num">12</span>
-          <span class="stat-label">Pending</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-num" style="color:var(--mint)">284</span>
-          <span class="stat-label">Verified</span>
-        </div>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <span class="stat-num">12</span>
+        <span class="stat-label">Pending</span>
       </div>
-
-      <div class="list-header">Recent Inspections</div>
-      <div class="entry">
-        <div class="entry-info">
-          <b>Sarah Jenkins</b>
-          <span>28 Bond St • 2m ago</span>
-        </div>
-        <div class="badge badge-success">Verified</div>
-      </div>
-      <div class="entry">
-        <div class="entry-info">
-          <b>Michael Chen</b>
-          <span>14 Miller Rd • 1h ago</span>
-        </div>
-        <div class="badge badge-warn">Pending</div>
-      </div>
-
-      <div style="flex:1"></div>
-      <div class="footer-nav">
-        <button class="btn btn-primary" onclick="showScreen(1)">+ New Entry</button>
+      <div class="stat-box">
+        <span class="stat-num" style="color:var(--mint)">284</span>
+        <span class="stat-label">Verified</span>
       </div>
     </div>
 
-    <!-- SCREEN 2: AGENT SETUP / REMOTE SEND -->
-    <div class="screen" id="screen-1">
-      <header>
-        <div style="font-size:20px; cursor:pointer;" onclick="showScreen(0)">←</div>
-        <div class="header-title">New CDD Entry</div>
-      </header>
-
-      <div class="card">
-        <div class="field-label">Property Reference</div>
-        <input class="field-value" id="fPropertyId" style="font-family:var(--body);" value="BMP-284910" />
-
-        <div class="field-label">Agent Name</div>
-        <input class="field-value" id="fAgentName" style="font-family:var(--body);" value="John Agent" />
+    <div class="list-header">Recent Inspections</div>
+    <div class="entry">
+      <div class="entry-info">
+        <b>Sarah Jenkins</b>
+        <span>28 Bond St • 2m ago</span>
       </div>
-
-      <div class="card" style="margin-top:0;">
-        <div class="field-label">Remote Verification</div>
-        <p style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">Send a secure link to the customer to capture their own ID before arrival.</p>
-        
-        <div class="field-label">Customer Mobile</div>
-        <input class="field-value" id="expPhone" placeholder="04XX XXX XXX" />
-        
-        <button class="btn btn-ghost" onclick="sendExplainer()">Send Explainer Link</button>
+      <div class="badge badge-success">Verified</div>
+    </div>
+    <div class="entry">
+      <div class="entry-info">
+        <b>Michael Chen</b>
+        <span>14 Miller Rd • 1h ago</span>
       </div>
-
-      <div style="flex:1"></div>
-      <div class="footer-nav">
-        <button class="btn btn-primary" onclick="showScreen(2)">Direct Capture Now</button>
-      </div>
+      <div class="badge badge-warn">Pending</div>
     </div>
 
-    <!-- SCREEN 3: EXPLAINER (Sarah's Video) -->
-    <div class="screen" id="screen-explainer">
-      <header>
-        <div class="logo-mark">B</div>
-        <div class="header-title">Identity Verification</div>
-      </header>
-
-      <div class="card" style="padding:16px;">
-        <h2 style="margin:0 0 8px; font-size:20px; letter-spacing:-0.5px;">Why we need this</h2>
-        <p style="font-size:14px; color:var(--ink-soft); margin:0 0 16px; line-height:1.5;">To keep our owners and community safe, we require a quick ID verification for all property inspections.</p>
-      </div>
-
-      <div class="video-card" style="display:block;">
-        <video class="video-holding-frame" src="/videos/sarah_explainer.mp4" controls playsinline style="position:relative; z-index:2; width:100%; height:100%; object-fit:cover;"></video>
-        <div class="lower-third" style="z-index:3;">
-          <div class="lt-mark">SJ</div>
-          <div class="lt-text">
-            <b>Sarah Jenkins</b>
-            <span>Head of Experience</span>
-          </div>
-        </div>
-      </div>
-
-      <div style="flex:1"></div>
-      <div class="footer-nav">
-        <button class="btn btn-primary" onclick="showScreen(2)">Continue to Capture</button>
-      </div>
+    <div style="flex:1"></div>
+    <div class="footer-nav">
+      <button class="btn btn-primary" onclick="showScreen(1)">+ New Entry</button>
     </div>
-
-    <!-- SCREEN 4: CAPTURE INTERFACE -->
-    <div class="screen" id="screen-2">
-      <div class="confirm-banner" id="confirmBanner">
-        <span>✓</span> ID DATA EXTRACTED
-      </div>
-      
-      <div class="cam-view">
-        <div class="stamp-seal" id="stampSeal">VERIFIED</div>
-        <div class="id-guide" id="camPlaceholder">
-          <div style="position:absolute; bottom:-30px; width:100%; text-align:center; color:rgba(255,255,255,0.7); font-size:12px; font-weight:600;">ALIGN ID WITHIN FRAME</div>
-        </div>
-        <div class="capture-btn" onclick="mockCapture()"></div>
-      </div>
-
-      <div class="card" style="margin-top:0;">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
-          <div>
-            <div class="field-label">Document</div>
-            <input class="field-value" id="fDocType" placeholder="---" />
-          </div>
-          <div>
-            <div class="field-label">DOB</div>
-            <input class="field-value" id="fDob" placeholder="---" />
-          </div>
-        </div>
-        <div class="field-label">Full Name</div>
-        <input class="field-value" id="fFullName" placeholder="Waiting for capture..." />
-        
-        <div class="field-label">Address</div>
-        <input class="field-value" id="fAddress" placeholder="---" />
-
-        <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
-          <input type="checkbox" id="cViewed" style="width:20px; height:20px;" checked>
-          <label for="cViewed" style="font-size:13px; font-weight:600;">I have viewed the original document</label>
-        </div>
-      </div>
-
-      <div class="footer-nav">
-        <button class="btn btn-primary" onclick="submitCapture()">Finalize & Register</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 5: SUCCESS / REGISTER -->
-    <div class="screen" id="screen-3">
-      <div class="success-hero">
-        <div class="check-circle">✓</div>
-        <h2 style="margin:0; font-size:24px;">Verification Complete</h2>
-        <p style="color:var(--ink-soft); font-size:15px; margin-top:8px;">Identity record has been securely stored in the CDD register.</p>
-      </div>
-
-      <div class="card">
-        <div class="field-label">Customer Mobile (Optional)</div>
-        <input class="field-value" id="fPhone" placeholder="For future check-ins" />
-        
-        <div class="field-label">Email Address</div>
-        <input class="field-value" id="fEmail" placeholder="To receive inspection report" />
-      </div>
-
-      <div style="flex:1"></div>
-      <div class="footer-nav">
-        <button class="btn btn-primary" onclick="showScreen(0)">Return to Register</button>
-      </div>
-    </div>
-
   </div>
 
-  <script>
-    // These functions are now handled by the React wrapper (Cdd.tsx)
-    // but kept here for prototype standalone compatibility
-    function showScreen(num) {
-      if (typeof window.showScreen === 'function') {
-        window.showScreen(num);
-      } else {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        const screens = ['screen-0', 'screen-1', 'screen-2', 'screen-3', 'screen-explainer'];
-        const id = typeof num === 'number' ? screens[num] : num;
-        document.getElementById(id).classList.add('active');
-      }
-    }
-  </script>
-</body>
-</html>
+  <!-- SCREEN 2: AGENT SETUP / REMOTE SEND -->
+  <div class="screen" id="screen-1">
+    <header>
+      <div style="font-size:20px; cursor:pointer;" onclick="showScreen(0)">←</div>
+      <div class="header-title">New CDD Entry</div>
+    </header>
+
+    <div class="card">
+      <div class="field-label">Property Reference</div>
+      <input class="field-value" id="fPropertyId" style="font-family:var(--body);" value="BMP-284910" />
+
+      <div class="field-label">Agent Name</div>
+      <input class="field-value" id="fAgentName" style="font-family:var(--body);" value="John Agent" />
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div class="field-label">Remote Verification</div>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">Send a secure link to the customer to capture their own ID before arrival.</p>
+      
+      <div class="field-label">Customer Mobile</div>
+      <input class="field-value" id="expPhone" placeholder="04XX XXX XXX" />
+      
+      <button class="btn btn-ghost" onclick="sendExplainer()">Send Explainer Link</button>
+    </div>
+
+    <div style="flex:1"></div>
+    <div class="footer-nav">
+      <button class="btn btn-primary" onclick="showScreen(2)">Direct Capture Now</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: EXPLAINER (Sarah's Video) -->
+  <div class="screen" id="screen-explainer">
+    <header>
+      <div class="logo-mark">B</div>
+      <div class="header-title">Identity Verification</div>
+    </header>
+
+    <div class="card" style="padding:16px;">
+      <h2 style="margin:0 0 8px; font-size:20px; letter-spacing:-0.5px;">Why we need this</h2>
+      <p style="font-size:14px; color:var(--ink-soft); margin:0 0 16px; line-height:1.5;">To keep our owners and community safe, we require a quick ID verification for all property inspections.</p>
+    </div>
+
+    <div class="video-card" style="display:block;">
+      <video class="video-holding-frame" src="/videos/sarah_explainer.mp4" controls playsinline style="position:relative; z-index:2; width:100%; height:100%; object-fit:cover;"></video>
+      <div class="lower-third" style="z-index:3;">
+        <div class="lt-mark">SJ</div>
+        <div class="lt-text">
+          <b>Sarah Jenkins</b>
+          <span>Head of Experience</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div class="footer-nav">
+      <button class="btn btn-primary" onclick="showScreen(2)">Continue to Capture</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: CAPTURE INTERFACE -->
+  <div class="screen" id="screen-2">
+    <div class="confirm-banner" id="confirmBanner">
+      <span>✓</span> ID DATA EXTRACTED
+    </div>
+    
+    <div class="cam-view">
+      <div class="stamp-seal" id="stampSeal">VERIFIED</div>
+      <div class="id-guide" id="camPlaceholder">
+        <div style="position:absolute; bottom:-30px; width:100%; text-align:center; color:rgba(255,255,255,0.7); font-size:12px; font-weight:600;">ALIGN ID WITHIN FRAME</div>
+      </div>
+      <div class="capture-btn" onclick="mockCapture()"></div>
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+        <div>
+          <div class="field-label">Document</div>
+          <input class="field-value" id="fDocType" placeholder="---" />
+        </div>
+        <div>
+          <div class="field-label">DOB</div>
+          <input class="field-value" id="fDob" placeholder="---" />
+        </div>
+      </div>
+      <div class="field-label">Full Name</div>
+      <input class="field-value" id="fFullName" placeholder="Waiting for capture..." />
+      
+      <div class="field-label">Address</div>
+      <input class="field-value" id="fAddress" placeholder="---" />
+
+      <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+        <input type="checkbox" id="cViewed" style="width:20px; height:20px;" checked>
+        <label for="cViewed" style="font-size:13px; font-weight:600;">I have viewed the original document</label>
+      </div>
+    </div>
+
+    <div class="footer-nav">
+      <button class="btn btn-primary" onclick="submitCapture()">Finalize & Register</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: SUCCESS / REGISTER -->
+  <div class="screen" id="screen-3">
+    <div class="success-hero">
+      <div class="check-circle">✓</div>
+      <h2 style="margin:0; font-size:24px;">Verification Complete</h2>
+      <p style="color:var(--ink-soft); font-size:15px; margin-top:8px;">Identity record has been securely stored in the CDD register.</p>
+    </div>
+
+    <div class="card">
+      <div class="field-label">Customer Mobile (Optional)</div>
+      <input class="field-value" id="fPhone" placeholder="For future check-ins" />
+      
+      <div class="field-label">Email Address</div>
+      <input class="field-value" id="fEmail" placeholder="To receive inspection report" />
+    </div>
+
+    <div style="flex:1"></div>
+    <div class="footer-nav">
+      <button class="btn btn-primary" onclick="showScreen(0)">Return to Register</button>
+    </div>
+  </div>
+
+</div>
