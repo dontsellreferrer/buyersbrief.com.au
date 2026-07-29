@@ -16,9 +16,11 @@ export default function Cdd() {
     if (demoNote) demoNote.remove();
 
     // 2. Navigation logic for the prototype screens
-    (window as any).showScreen = (num: number) => {
+    (window as any).showScreen = (num: any) => {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      const target = document.getElementById(`screen-${num}`);
+      const screens = ['screen-0', 'screen-1', 'screen-2', 'screen-3', 'screen-explainer'];
+      const id = typeof num === 'number' ? screens[num] : num;
+      const target = document.getElementById(id);
       if (target) target.classList.add('active');
     };
 
