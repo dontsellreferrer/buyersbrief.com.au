@@ -233,7 +233,7 @@
     border-radius: 14px;
     background: #000;
     width: calc(100% - 32px);
-    height: 240px;
+    aspect-ratio: 16 / 9;
     position: relative;
     overflow: hidden;
     display: flex;
@@ -246,7 +246,7 @@
     display: block;
     z-index: 1;
     background: #000;
-    object-fit: cover;
+    object-fit: contain; /* Prevent squishing */
   }
   .lower-third {
     position: absolute; left: 0; right: 0; bottom: 0;
