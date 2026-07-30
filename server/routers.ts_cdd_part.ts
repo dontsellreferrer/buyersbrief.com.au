@@ -71,7 +71,7 @@
           token: token,
         });
 
-        const explainerUrl = `${process.env.BASE_URL || "https://buyersbrief.com.au"}/cdd/explainer?propertyId=${encodeURIComponent(input.propertyId)}&phone=${encodeURIComponent(input.phone)}&token=${token}`;
+        const explainerUrl = `${process.env.BASE_URL || "https://buymyplace.com.au"}/cdd/explainer?propertyId=${encodeURIComponent(input.propertyId)}&phone=${encodeURIComponent(input.phone)}&token=${token}`;
         
         // Clicksend SMS logic
         const username = process.env.CLICKSEND_USERNAME;
@@ -88,7 +88,7 @@
               messages: [{
                 to: input.phone,
                 body: `Hi, to inspect the property at ${input.propertyId}, please view this identity verification explainer: ${explainerUrl}`,
-                source: "buyersbrief"
+                source: "buymyplace"
               }]
             }),
           });

@@ -81,7 +81,7 @@ export function registerCddApi(app: Express) {
           method: "POST",
           headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: [{ to: phone, body: `Identity verification for ${propertyId}: ${explainerUrl}`, source: "buyersbrief" }]
+            messages: [{ to: phone, body: `Identity verification for ${propertyId}: ${explainerUrl}`, source: "buymyplace" }]
           }),
         });
       }
