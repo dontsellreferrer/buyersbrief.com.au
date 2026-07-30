@@ -278,8 +278,17 @@
     font-family: var(--display); font-weight: 700; font-size: 13px;
     color: var(--mint); letter-spacing: 0.01em;
   }
-  .reasons { margin: 4px 16px 0; }
-  .reasons li { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+  .reasons { margin: 12px 16px 0; padding-left: 20px; }
+  .reasons li { font-size: 14px; line-height: 1.5; margin-bottom: 12px; color: var(--ink-text); }
+  .austrac-link {
+    display: block;
+    margin: 4px 16px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .austrac-link:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -402,12 +411,16 @@
     </div>
 
     <ul class="reasons">
-      <li>Confirming you are who you say you are before granting access to a private residence.</li>
-      <li>Creating a secure, digital audit trail for the property owner's peace of mind.</li>
+      <li>Under Australian law, we're required to verify the identity of everyone involved in a property transaction before it can proceed. This applies to everyone — it isn't specific to you.</li>
+      <li>At minimum we need your <strong>full name</strong> and either your <strong>date of birth</strong> or <strong>residential address</strong>. We don't need a copy of your licence, and the photo itself is never stored.</li>
     </ul>
 
+    <a href="https://www.austrac.gov.au/industry-and-business/obligations-and-guidance/your-amlctf-program/customer-due-diligence" target="_blank" class="austrac-link">
+      See the legislation on AUSTRAC's website ↗
+    </a>
+
     <div style="padding: 14px 16px;">
-      <button class="btn btn-primary" onclick="continueToCapture()">Continue to Capture</button>
+      <button class="btn btn-primary" onclick="continueToCapture()">Continue and provide my details</button>
     </div>
   </section>
 
