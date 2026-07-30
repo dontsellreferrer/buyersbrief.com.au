@@ -248,13 +248,6 @@
     background: #000;
     object-fit: cover;
   }
-  .video-loading {
-    position: absolute;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    z-index: 0;
-  }
   .lower-third {
     position: absolute; left: 0; right: 0; bottom: 0;
     display: flex; align-items: center; gap: 8px;
@@ -340,7 +333,8 @@
        <button class="btn btn-primary" id="captureBtn" onclick="captureAndExtract()" style="display:none;">Capture Photo</button>
     </div>
 
-    <div class="card" id="fieldsCard" style="display:none;">
+    <!-- Always visible card for OCR details -->
+    <div class="card" id="fieldsCard">
       <div class="field-label" style="margin-top:0;">Document type</div>
       <input class="field-value" id="fDocType" placeholder="---" />
 
@@ -354,7 +348,8 @@
       <input class="field-value" id="fAddress" placeholder="---" />
     </div>
 
-    <div class="card" id="contactCard" style="display:none; margin-top:0;">
+    <!-- Always visible card for Contact info -->
+    <div class="card" id="contactCard" style="margin-top:0;">
       <div class="field-label" style="margin-top:0;">Phone</div>
       <input class="field-value" id="fPhone" placeholder="For contact purposes only" />
 
@@ -395,9 +390,7 @@
     </div>
 
     <div class="video-card">
-      <div class="video-loading">Loading video...</div>
-      <video class="video-element" id="sarahVideo" controls playsinline preload="auto" poster="https://buyersbrief.com.au/sarah_poster.jpg">
-        <source src="https://buyersbrief.com.au/sarah_explainer.mp4" type="video/mp4">
+      <video class="video-element" id="sarahVideo" controls playsinline preload="auto" poster="https://buyersbrief.com.au/sarah_poster.jpg" src="https://buyersbrief.com.au/sarah_explainer.mp4">
         Your browser does not support the video tag.
       </video>
       <div class="lower-third">
@@ -577,8 +570,6 @@
       document.getElementById('fAddress').value = data.address || '';
       
       document.getElementById('confirmBanner').style.display = 'flex';
-      document.getElementById('fieldsCard').style.display = 'block';
-      document.getElementById('contactCard').style.display = 'block';
       document.getElementById('stampSeal').classList.add('show');
       document.getElementById('submitBtn').disabled = false;
       captureBtn.textContent = 'Retake Photo';
