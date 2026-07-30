@@ -355,7 +355,7 @@
     </div>
   </section>
 
-  <!-- SCREEN 2: Explainer (Copy of Screen 4) -->
+  <!-- SCREEN 2: Explainer — Customer View plus Remote Verification -->
   <section id="screen-2" class="screen">
     <div class="topbar">
       <div class="brand-row">
@@ -367,6 +367,15 @@
       </div>
       <p class="eyebrow">IDENTIFICATION REQUIREMENT</p>
       <h1>Why we need this</h1>
+    </div>
+
+    <div class="card" style="margin-bottom:0;">
+      <div class="field-label" style="margin-top:0;">Setup Remote Verification</div>
+      <input class="field-value" id="ePropertyId" style="font-family:var(--body);" value="BMP-284910" />
+      <div class="field-label">Customer Mobile</div>
+      <input class="field-value" id="ePhone" placeholder="04XX XXX XXX" />
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="sendExplainerLink()">Send explainer link by SMS</button>
+      <p class="ref-code" id="sendConfirm" style="display:none;margin-top:10px;color:var(--verified);">Link sent successfully</p>
     </div>
 
     <div class="video-card">
@@ -386,16 +395,6 @@
 
     <div style="padding: 14px 16px;">
       <button class="btn btn-primary" onclick="continueToCapture()">Continue and provide my details</button>
-    </div>
-
-    <!-- Move Remote Card to bottom of Explainer -->
-    <div class="card" style="margin-top:20px;">
-      <div class="field-label">Setup Remote Verification</div>
-      <input class="field-value" id="ePropertyId" style="font-family:var(--body);" value="BMP-284910" />
-      <div class="field-label">Customer Mobile</div>
-      <input class="field-value" id="ePhone" placeholder="04XX XXX XXX" />
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="sendExplainerLink()">Send explainer link by SMS</button>
-      <p class="ref-code" id="sendConfirm" style="display:none;margin-top:10px;color:var(--verified);">Link sent successfully</p>
     </div>
   </section>
 
