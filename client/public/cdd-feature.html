@@ -233,16 +233,27 @@
     border-radius: 14px;
     background: #000;
     width: calc(100% - 32px);
+    height: 240px;
     position: relative;
     overflow: hidden;
-    /* Removed display: flex and fixed height to let video define height or use min-height */
-    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .video-element {
     width: 100%;
-    height: auto;
+    height: 100%;
     display: block;
+    z-index: 1;
     background: #000;
+    object-fit: cover;
+  }
+  .video-loading {
+    position: absolute;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 0;
   }
   .lower-third {
     position: absolute; left: 0; right: 0; bottom: 0;
@@ -330,13 +341,21 @@
       <div class="field-label">Date of birth <span class="flag" id="flagDob" style="display:none;color:var(--amber);font-weight:700;">Check this</span></div>
       <input class="field-value" id="fDob" placeholder="---" />
 
-      <div class="field-label">Address</div>
+      <div class="field-label">Address — from OCR</div>
       <input class="field-value" id="fAddress" placeholder="---" />
+    </div>
+
+    <div class="card" id="contactCard" style="display:none;">
+      <div class="field-label" style="margin-top:0;">Phone</div>
+      <input class="field-value" id="fPhone" placeholder="For contact purposes only" />
+
+      <div class="field-label">Email</div>
+      <input class="field-value" id="fEmail" placeholder="For contact purposes only" />
     </div>
 
     <label class="checkbox-row">
       <input type="checkbox" id="fViewedOriginal" checked />
-      <span>I have viewed the original document</span>
+      <span>I viewed the original ID document in person</span>
     </label>
 
     <div style="padding: 14px 16px;">
@@ -367,6 +386,7 @@
     </div>
 
     <div class="video-card">
+      <div class="video-loading">Loading video...</div>
       <video class="video-element" id="sarahVideo" controls playsinline preload="auto" poster="/sarah_poster.jpg">
         <source src="/sarah_explainer.mp4" type="video/mp4">
         Your browser does not support the video tag.
@@ -545,6 +565,7 @@
       
       document.getElementById('confirmBanner').style.display = 'flex';
       document.getElementById('fieldsCard').style.display = 'block';
+      document.getElementById('contactCard').style.display = 'block';
       document.getElementById('stampSeal').classList.add('show');
       document.getElementById('submitBtn').disabled = false;
       captureBtn.textContent = 'Retake Photo';
@@ -564,6 +585,8 @@
       fullName: document.getElementById('fFullName').value,
       dob: document.getElementById('fDob').value,
       address: document.getElementById('fAddress').value,
+      phone: document.getElementById('fPhone').value,
+      email: document.getElementById('fEmail').value,
       viewedOriginal: document.getElementById('fViewedOriginal').checked,
       status: 'direct'
     };
