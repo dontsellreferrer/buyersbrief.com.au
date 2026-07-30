@@ -355,7 +355,7 @@
     </div>
   </section>
 
-  <!-- SCREEN 2: Explainer -->
+  <!-- SCREEN 2: Explainer (Copy of Screen 4) -->
   <section id="screen-2" class="screen">
     <div class="topbar">
       <div class="brand-row">
@@ -363,18 +363,10 @@
           <svg width="13" height="14" viewBox="0 0 24 26" fill="none"><path d="M12 0C6.5 0 3 3 3 7.5c0 2.4 1.1 4.3 2.9 5.6L3.3 26h17.4l-2.6-12.9c1.8-1.3 2.9-3.2 2.9-5.6C21 3 17.5 0 12 0z" fill="var(--mint)"/><circle cx="12" cy="9" r="2.4" fill="var(--ink)"/><rect x="10.8" y="10.5" width="2.4" height="4.5" rx="1.1" fill="var(--ink)"/></svg>
         </span>
         <span class="wordmark">buyersbrief</span>
+        <span class="cdd-tag">Customer Due Diligence</span>
       </div>
-      <p class="eyebrow">Verification Brief</p>
+      <p class="eyebrow">IDENTIFICATION REQUIREMENT</p>
       <h1>Why we need this</h1>
-    </div>
-
-    <div class="card" style="margin-bottom:0;">
-      <div class="field-label">Setup Remote Verification</div>
-      <input class="field-value" id="ePropertyId" style="font-family:var(--body);" value="BMP-284910" />
-      <div class="field-label">Customer Mobile</div>
-      <input class="field-value" id="ePhone" placeholder="04XX XXX XXX" />
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="sendExplainerLink()">Send explainer link by SMS</button>
-      <p class="ref-code" id="sendConfirm" style="display:none;margin-top:10px;color:var(--verified);">Link sent successfully</p>
     </div>
 
     <div class="video-card">
@@ -394,6 +386,16 @@
 
     <div style="padding: 14px 16px;">
       <button class="btn btn-primary" onclick="continueToCapture()">Continue and provide my details</button>
+    </div>
+
+    <!-- Move Remote Card to bottom of Explainer -->
+    <div class="card" style="margin-top:20px;">
+      <div class="field-label">Setup Remote Verification</div>
+      <input class="field-value" id="ePropertyId" style="font-family:var(--body);" value="BMP-284910" />
+      <div class="field-label">Customer Mobile</div>
+      <input class="field-value" id="ePhone" placeholder="04XX XXX XXX" />
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="sendExplainerLink()">Send explainer link by SMS</button>
+      <p class="ref-code" id="sendConfirm" style="display:none;margin-top:10px;color:var(--verified);">Link sent successfully</p>
     </div>
   </section>
 
