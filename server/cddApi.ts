@@ -11,12 +11,22 @@ export function registerCddApi(app: Express) {
       if (!image) return res.status(400).json({ error: "Image required" });
 
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      console.log("[OCR] Requesting extraction for image...");
+      
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are an OCR expert. Extract Full Name, Date of Birth (DD/MM/YYYY), and Address from the provided ID document. Output as JSON only. If a field is missing, use null. Provide a confidence score (0-1) for each field. Passports do not have addresses."
+            content: `You are an OCR expert. Extract details from the provided ID document. 
+            Output ONLY a JSON object with the following keys:
+            - documentType: (e.g., "Driver License", "Passport")
+            - fullName: (The person's full name)
+            - dob: (Date of birth in DD/MM/YYYY format)
+            - address: (Full residential address, or null if not present)
+            - confidence: { fullName: 0.9, dob: 0.8, address: 0.7 } (Confidence scores between 0 and 1)
+            
+            If a field is not found, use null.`
           },
           {
             role: "user",
@@ -30,7 +40,9 @@ export function registerCddApi(app: Express) {
       });
 
       const content = response.choices[0].message.content;
-      res.json(JSON.parse(content || "{}"));
+      console.log("[OCR] OpenAI Response:", content);
+      const parsed = JSON.parse(content || "{}");
+      res.json(parsed);
     } catch (err: any) {
       console.error("OCR Error:", err);
       res.status(500).json({ error: err.message });
