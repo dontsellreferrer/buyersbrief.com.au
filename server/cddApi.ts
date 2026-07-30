@@ -92,6 +92,22 @@ export function registerCddApi(app: Express) {
     }
   });
 
+  // Approve a completed register entry for inspection
+  app.post("/api/cdd/:id/approve", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ error: "Valid entry ID required" });
+      }
+
+      const entry = await updateCddEntry(id, { status: "approved" });
+      if (!entry) return res.status(404).json({ error: "Register entry not found" });
+      res.json({ success: true, entry });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Get Register (for agent view)
   app.get("/api/cdd/list", async (req, res) => {
     try {

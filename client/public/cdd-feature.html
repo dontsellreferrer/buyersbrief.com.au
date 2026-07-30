@@ -261,17 +261,68 @@
   }
   .austrac-link:hover { text-decoration: underline; }
 
-  /* Register specific */
-  .register-head { padding: 18px 20px 10px; display: flex; align-items: baseline; justify-content: space-between; }
-  .register-head h2 { font-family: var(--display); font-size: 18px; margin: 0; }
-  .register-head .count { font-size: 12px; color: var(--muted); font-weight: 600; }
-  #registerList { padding: 0 16px; }
-  .row { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
-  .row-main .name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
-  .row-main .meta { font-size: 12px; color: var(--muted); }
-  .status { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; }
-  .status.direct { background: var(--verified-soft); color: var(--verified); }
+  /* ---------- Screen 3: register ---------- */
+  #register-view .topbar .eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mint);
+    margin: 0 0 4px;
+  }
+  .register-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 16px 0;
+  }
+  .register-head h2 {
+    font-family: var(--display); font-weight: 600; font-size: 15px;
+    margin: 0; letter-spacing: 0.01em; color: var(--ink);
+  }
+  .register-head .count {
+    appearance: none; border: 0; background: transparent; padding: 0;
+    font-family: var(--body); font-size: 12px; color: var(--muted); cursor: pointer;
+  }
+  #registerList { margin-top: 4px; border-top: 1px solid var(--line); }
+  .row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 13px 16px; border-bottom: 1px solid var(--line); background: var(--paper);
+    min-height: 86px;
+  }
+  .row-main { flex: 1 1 auto; min-width: 0; padding-right: 12px; }
+  .row-main .name { font-size: 14.5px; font-weight: 600; }
+  .row-main .meta {
+    font-size: 12px; color: var(--muted); margin-top: 2px;
+    font-family: var(--mono); line-height: 1.35; overflow-wrap: anywhere;
+  }
+  .row-side { flex: 0 0 128px; text-align: right; }
+  .status {
+    display: inline-block; min-width: 110px; text-align: center;
+    font-size: 10px; line-height: 1.05; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.03em; padding: 3px 8px; border-radius: 999px;
+  }
+  .status.completed { background: var(--mint-soft); color: var(--verified); }
+  .status.approved { background: var(--ink); color: #fff; }
+  .status.direct { background: #E7EAF3; color: var(--ink-soft); }
   .status.sent { background: var(--amber-soft); color: var(--amber); }
+  .viewed-tag { font-size: 10.5px; font-weight: 600; margin-top: 5px; display: block; line-height: 1.25; }
+  .viewed-tag.yes { color: var(--verified); }
+  .viewed-tag.no { color: var(--amber); }
+  .time { font-size: 11px; color: var(--muted); }
+  .row-approve {
+    width: auto; padding: 5px 10px; font-size: 11px; margin: 6px 0 0 auto;
+    line-height: 1.15;
+  }
+  .register-empty {
+    padding: 34px 16px; text-align: center; background: var(--paper);
+    border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px;
+  }
+  @media (max-width: 390px) {
+    .row { align-items: flex-start; }
+    .row-main { padding-right: 8px; }
+    .row-main .meta { font-size: 11px; }
+    .row-side { flex-basis: 116px; }
+    .status { min-width: 102px; }
+  }
 </style>
 </head>
 <body>
@@ -400,29 +451,32 @@
     </div>
   </section>
 
-  <!-- SCREEN 3: Register -->
+  <!-- SCREEN 3: Today's captures (live register) -->
   <section id="screen-3" class="screen">
-    <div class="topbar">
-      <div class="brand-row">
-        <span class="mark">
-          <svg width="13" height="14" viewBox="0 0 24 26" fill="none"><path d="M12 0C6.5 0 3 3 3 7.5c0 2.4 1.1 4.3 2.9 5.6L3.3 26h17.4l-2.6-12.9c1.8-1.3 2.9-3.2 2.9-5.6C21 3 17.5 0 12 0z" fill="var(--mint)"/><circle cx="12" cy="9" r="2.4" fill="var(--ink)"/><rect x="10.8" y="10.5" width="2.4" height="4.5" rx="1.1" fill="var(--ink)"/></svg>
-        </span>
-        <span class="wordmark">buyersbrief</span>
+    <div id="register-view">
+      <div class="topbar">
+        <div class="brand-row">
+          <span class="mark">
+            <svg width="13" height="14" viewBox="0 0 24 26" fill="none"><path d="M12 0C6.5 0 3 3 3 7.5c0 2.4 1.1 4.3 2.9 5.6L3.3 26h17.4l-2.6-12.9c1.8-1.3 2.9-3.2 2.9-5.6C21 3 17.5 0 12 0z" fill="var(--mint)"/><circle cx="12" cy="9" r="2.4" fill="var(--ink)"/><rect x="10.8" y="10.5" width="2.4" height="4.5" rx="1.1" fill="var(--ink)"/></svg>
+          </span>
+          <span class="wordmark">buymyplace</span>
+          <span class="cdd-tag">Customer Due Diligence</span>
+        </div>
+        <p class="eyebrow">Register — filtered</p>
+        <h1>Today's captures</h1>
       </div>
-      <h1>CDD Register</h1>
-    </div>
 
-    <div class="register-head">
-      <h2>Recent Verifications</h2>
-      <span class="count" id="entryCount">0 entries</span>
-    </div>
+      <div class="register-head">
+        <h2 id="registerCount">0 today</h2>
+        <button type="button" class="count" id="registerRangeToggle" onclick="toggleRegisterRange()">Full register →</button>
+      </div>
 
-    <div id="registerList">
-      <!-- Dynamic list -->
-    </div>
+      <div id="registerList" aria-live="polite"></div>
 
-    <div style="padding: 20px 16px;">
-      <button class="btn btn-ghost" onclick="loadRegister()">Refresh Register</button>
+      <div style="padding:16px;">
+        <button class="btn btn-primary" onclick="emailRegister()">Send register to owner/agent</button>
+        <p class="ref-code" id="emailConfirm" style="display:none;margin-top:8px;text-align:left;">Register notification requested for the owner/agent on file</p>
+      </div>
     </div>
   </section>
 
@@ -488,6 +542,8 @@
 
 <script>
   let currentStream = null;
+  let registerEntries = [];
+  let registerShowAll = false;
 
   function showScreen(num, btn) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -512,6 +568,7 @@
       const video = document.getElementById('custSarahVideo');
       if (video) video.pause();
     }
+    if (num === 3) loadRegister();
   }
 
   async function startCamera() {
@@ -644,29 +701,136 @@
     showScreen(1, document.querySelectorAll('.demo-tabs button')[0]);
   }
 
+  function escapeHtml(value) {
+    const node = document.createElement('div');
+    node.textContent = value == null ? '' : String(value);
+    return node.innerHTML;
+  }
+
+  function isToday(value) {
+    const date = new Date(value);
+    const today = new Date();
+    return !Number.isNaN(date.getTime()) &&
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate();
+  }
+
+  function formatRegisterTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('en-AU', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(date).replace(/\s/g, '').toLowerCase();
+  }
+
+  function registerStatusLabel(status) {
+    if (status === 'direct') return 'Direct<br>capture';
+    if (status === 'approved') return 'Approved';
+    if (status === 'completed') return 'Completed';
+    return 'Sent';
+  }
+
+  function renderRegister() {
+    const list = document.getElementById('registerList');
+    const entries = registerShowAll
+      ? registerEntries
+      : registerEntries.filter(entry => isToday(entry.createdAt));
+
+    document.getElementById('registerCount').textContent = registerShowAll
+      ? entries.length + ' total'
+      : entries.length + ' today';
+    document.getElementById('registerRangeToggle').textContent = registerShowAll
+      ? 'Today’s captures →'
+      : 'Full register →';
+
+    list.innerHTML = '';
+    if (!entries.length) {
+      const empty = document.createElement('div');
+      empty.className = 'register-empty';
+      empty.textContent = registerShowAll ? 'No register entries yet' : 'No captures today';
+      list.appendChild(empty);
+      return;
+    }
+
+    entries.forEach(entry => {
+      const allowedStatuses = ['direct', 'sent', 'completed', 'approved'];
+      const status = allowedStatuses.includes(entry.status) ? entry.status : 'sent';
+      const isPending = status === 'sent' && !entry.fullName;
+      const details = isPending
+        ? [entry.propertyId, entry.phone ? 'Invite sent to ' + entry.phone : 'Invite sent', 'awaiting response']
+        : [entry.propertyId, entry.dob, entry.address];
+      const viewedText = status === 'direct'
+        ? (entry.viewedOriginal
+            ? '✓ Viewed original' + (entry.agentName ? ' — ' + entry.agentName : '')
+            : 'Original not confirmed')
+        : ((status === 'completed' || status === 'approved')
+            ? 'Not viewed — completed remotely'
+            : '');
+      const viewedClass = status === 'direct' && entry.viewedOriginal ? 'yes' : 'no';
+      const time = formatRegisterTime(entry.createdAt);
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="row-main">
+          <div class="name"${isPending ? ' style="color:var(--muted);"' : ''}>${escapeHtml(entry.fullName || '—')}</div>
+          <div class="meta">${details.filter(Boolean).map(escapeHtml).join(' · ')}</div>
+        </div>
+        <div class="row-side">
+          <div class="status ${status}" id="status-${Number(entry.id)}">${registerStatusLabel(status)}</div>
+          ${viewedText ? `<span class="viewed-tag ${viewedClass}">${escapeHtml(viewedText)}</span>` : ''}
+          ${time ? `<div class="time" style="margin-top:5px;">${escapeHtml(time)}</div>` : ''}
+          ${status === 'completed' ? `<button class="btn btn-ghost row-approve" id="approve-${Number(entry.id)}" onclick="approveEntry(${Number(entry.id)})">Approve to inspect</button>` : ''}
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
   async function loadRegister() {
     try {
       const res = await fetch('/api/cdd/list');
+      if (!res.ok) throw new Error('Register unavailable');
       const data = await res.json();
-      const list = document.getElementById('registerList');
-      list.innerHTML = '';
-      document.getElementById('entryCount').textContent = (data.length || 0) + ' entries';
-      
-      if (Array.isArray(data)) {
-        data.forEach(entry => {
-          const row = document.createElement('div');
-          row.className = 'row';
-          row.innerHTML = `
-            <div class="row-main">
-              <div class="name">${entry.fullName || 'Pending'}</div>
-              <div class="meta">${entry.documentType || '---'} • ${entry.propertyId}</div>
-            </div>
-            <span class="status ${entry.status}">${entry.status}</span>
-          `;
-          list.appendChild(row);
-        });
+      registerEntries = Array.isArray(data) ? data : [];
+      renderRegister();
+    } catch (e) {
+      registerEntries = [];
+      renderRegister();
+    }
+  }
+
+  function toggleRegisterRange() {
+    registerShowAll = !registerShowAll;
+    renderRegister();
+  }
+
+  async function approveEntry(id) {
+    const button = document.getElementById('approve-' + id);
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Approving…';
+    }
+
+    try {
+      const res = await fetch('/api/cdd/' + id + '/approve', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Approval failed');
+      await loadRegister();
+    } catch (e) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Approve to inspect';
       }
-    } catch (e) {}
+      alert(e.message || 'Unable to approve this entry.');
+    }
+  }
+
+  function emailRegister() {
+    const confirm = document.getElementById('emailConfirm');
+    confirm.style.display = 'block';
   }
 
   function custShowCapture() {
